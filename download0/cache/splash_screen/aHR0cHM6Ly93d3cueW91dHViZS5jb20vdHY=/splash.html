@@ -214,8 +214,6 @@
                 gc();
                 map1.set(0x0, 0x1);
                 
-                window.stable_arrays = { victim_arr, obj_arr, oob_arr };
-                
                 //oob_arr[31] : 0x2 -- victim_arr length
                 //oob_arr[32] : 0xf -- victim_arr ExternalPointer_t 
                 //oob_arr[33] : 0x27e8412d1 -- victm_arr base_pointer
@@ -916,7 +914,7 @@
                 //gettimeofday plt
                 //0x113B18
                 const gettimeofdayAddr = read64(libc_base + 0x113B18n);
-                //await log("gettimeofdayAddr @: " + toHex(gettimeofdayAddr));
+                await log("gettimeofdayAddr @: " + toHex(gettimeofdayAddr));
                 
                 const mod_info = malloc(0x300);
                 //await log("mod_info buffer @ " + toHex(mod_info));
@@ -1034,6 +1032,7 @@
                 firmwareVersion = get_fwversion();
                 
                 send_notification(version_string + "\nFW : " + firmwareVersion);
+                await log("FW detected : " + firmwareVersion);
                 
                 load_localscript('remotejsloader.js');
                 
@@ -1042,7 +1041,7 @@
                 await log(e.stack);
             }
             
-        }, 800);
+        }, 750);
     </script>
 </body>
 </html>
