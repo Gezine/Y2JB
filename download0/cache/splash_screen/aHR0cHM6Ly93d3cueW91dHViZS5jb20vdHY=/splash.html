@@ -158,7 +158,7 @@
             }
         }
 
-        function loadScriptFromName(filename) {
+        function load_localscript(filename) {
             const script = document.createElement('script');
             script.src = filename;
             document.head.appendChild(script);
@@ -1035,7 +1035,7 @@
                 
                 send_notification(version_string + "\nFW : " + firmwareVersion);
                 
-                loadScriptFromName('remotejsloader.js');
+                load_localscript('remotejsloader.js');
                 
             } catch (e) {                
                 await log('EXCEPTION: ' + e.message);
