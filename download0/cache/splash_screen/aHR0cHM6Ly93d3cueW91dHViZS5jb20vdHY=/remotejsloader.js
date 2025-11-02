@@ -1,3 +1,10 @@
+/*
+    Copyright (C) 2025 Gezine
+    
+    This software may be modified and distributed under the terms
+    of the MIT license.  See the LICENSE file for details.
+*/
+
 (async function() {
     const AF_INET = 0x2n;
     const SOCK_STREAM = 0x1n;
