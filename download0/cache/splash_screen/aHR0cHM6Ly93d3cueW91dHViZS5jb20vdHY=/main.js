@@ -7,6 +7,14 @@
 
 const version_string = "Y2JB 1.2 beta by Gezine";
 
+function load_localscript(filename) {
+    const script = document.createElement('script');
+    script.src = filename;
+    document.head.appendChild(script);
+}
+
+load_localscript('global.js');
+
 let NETWORK_LOGGING = false;
 // Use setlogserver.js payload to change server url at runtime
 let LOG_SERVER = 'http://192.168.1.180:8080/log';
@@ -78,12 +86,6 @@ async function log(message) {
     }
 }
 
-function load_localscript(filename) {
-    const script = document.createElement('script');
-    script.src = filename;
-    document.head.appendChild(script);
-}
-
 function toHex(num) {
     return '0x' + BigInt(num).toString(16).padStart(16, '0');
 }
@@ -107,15 +109,15 @@ function trigger() {
     return v1[1];
 }
 
-load_localscript('global.js');
-
 (async function() {
     try {
         await log(version_string);
         await log('Starting Exploit');
         
-        gc();
-        gc();
+        await gc();
+        await gc();
+        await gc();
+        await gc();
         
         // CVE-2021-38003
         // CVE-2022-4174 faster hole leak
