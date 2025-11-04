@@ -57,10 +57,10 @@ async function log(message) {
         outputElement.style.paddingTop = topPadding + 'px'; 
     }
     
-    const lines = message.split('\n').filter(line => line.length > 0);
+    const lines = message.split('\n');
     lines.forEach(line => {
         let lineDiv = document.createElement('div');
-        lineDiv.textContent = line;
+        lineDiv.textContent = line === '' ? '\u00A0' : line;
         lineDiv.style.fontSize = fontSize + 'px';
         
         outputElement.appendChild(lineDiv);
