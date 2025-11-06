@@ -1,5 +1,5 @@
+// https://github.com/shahrilnet/remote_lua_loader/blob/main/savedata/gpu.lua
 // Credit to flatz and shadPS4 project for references
-// Ported from Lua to JavaScript
 
 // GPU page table
 

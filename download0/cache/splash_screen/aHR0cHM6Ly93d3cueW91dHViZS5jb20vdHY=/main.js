@@ -855,6 +855,9 @@ function trigger() {
             return return_value_buf[0];
         }
         
+        libc_strerror = libc_base + 0x73520n;
+        libc_error = libc_base + 0xCC5A0n;
+        
         load_localscript('misc.js');
         
         if (psn_matches >= 1 && yt_matches >= 1) {
@@ -875,9 +878,6 @@ function trigger() {
         load_localscript('kernel.js');
         load_localscript('kernel_offset.js');
         load_localscript('gpu.js');
-        
-        libc_strerror = libc_base + 0x73520n;
-        libc_error = libc_base + 0xCC5A0n;
         
         ////////////////////
         // MAIN EXECUTION //
