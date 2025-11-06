@@ -45,7 +45,8 @@ const fontSize = Math.floor(window.innerHeight / maxLines * 0.85);
 const leftPadding = Math.floor(window.innerWidth * 0.005);
 const topPadding = Math.floor(window.innerHeight * 0.005);
 
-async function log(message) {
+async function log(msg) {
+    let message = String(msg);
     if (!outputElement) {
         outputElement = document.getElementById('output');
         if (!outputElement) {
@@ -606,7 +607,7 @@ function trigger() {
         }
         
         malloc = function(size) {
-            const buffer = new ArrayBuffer(size);
+            const buffer = new ArrayBuffer(Number(size));
             const buffer_addr = addrof(buffer);
             const backing_store = read64(buffer_addr + 0x20n);
             allocated_buffers.push(buffer);
@@ -838,6 +839,9 @@ function trigger() {
         await log("syscall_wrapper @ " + toHex(syscall_wrapper));
         
         syscall = function(syscall_num, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
+            if(syscall_num === undefined) {
+                throw new Error("ERROR: syscall not defined");
+            }
             // GC friendly
             // Get new bytecode_addr each time
             const bc_start = get_bytecode_addr() + 0x36n;
@@ -863,10 +867,21 @@ function trigger() {
         
         await checkLogServer();
         
-        firmwareVersion = get_fwversion();
+        FW_VERSION = get_fwversion();
         
-        send_notification(version_string + "\nFW : " + firmwareVersion);
-        await log("FW detected : " + firmwareVersion);
+        send_notification(version_string + "\nFW : " + FW_VERSION);
+        await log("FW detected : " + FW_VERSION);
+        
+        load_localscript('kernel.js');
+        load_localscript('kernel_offset.js');
+        load_localscript('gpu.js');
+        
+        libc_strerror = libc_base + 0x73520n;
+        libc_error = libc_base + 0xCC5A0n;
+        
+        ////////////////////
+        // MAIN EXECUTION //
+        ////////////////////
         
         load_localscript('remotejsloader.js');
         

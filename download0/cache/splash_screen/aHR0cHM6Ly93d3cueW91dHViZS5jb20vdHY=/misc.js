@@ -55,6 +55,14 @@ function send_notification(text) {
     
 }
 
+function get_error_string() {
+    const error_func = call(libc_error);
+    const errno = read64(error_func);
+    const strerror = call(libc_strerror, errno);
+    return Number(errno) + " " + read_null_terminated_string(strerror);
+}
+
+
 function sysctlbyname(name, oldp, oldp_len, newp, newp_len) {
     const translate_name_mib = malloc(0x8);
     const buf_size = 0x70;
@@ -67,11 +75,11 @@ function sysctlbyname(name, oldp, oldp_len, newp, newp_len) {
     const name_addr = alloc_string(name);
     const name_len = BigInt(name.length);
     
-    if (syscall(SYSCALL.sysctl, translate_name_mib, 2n, mib, size, name_addr, name_len) < 0n) {
+    if (syscall(SYSCALL.sysctl, translate_name_mib, 2n, mib, size, name_addr, name_len) === 0xffffffffffffffffn) {
         throw new Error("failed to translate sysctl name to mib (" + name + ")");
     }
     
-    if (syscall(SYSCALL.sysctl, mib, 2n, oldp, oldp_len, newp, newp_len) < 0n) {
+    if (syscall(SYSCALL.sysctl, mib, 2n, oldp, oldp_len, newp, newp_len) === 0xffffffffffffffffn) {
         return false;
     }
     
@@ -247,5 +255,177 @@ function get_current_ip() {
     }
     
     return null;
+}
+
+function is_jailbroken() {
+
+    const cur_uid = syscall(SYSCALL.getuid);
+    const is_in_sandbox = syscall(SYSCALL.is_in_sandbox);
+    if (cur_uid === 0n && is_in_sandbox === 0n) {
+        return true;
+    } else {
+        
+        // Check if elfldr is running at 9021
+        const sockaddr_in = malloc(16);
+        const enable = malloc(4);
+        
+        const sock_fd = syscall(SYSCALL.socket, AF_INET, SOCK_STREAM, 0n);
+        if (sock_fd === 0xffffffffffffffffn) {
+            throw new Error("socket failed: " + toHex(sock_fd));
+        }
+    
+        try {
+            write32(enable, 1);
+            syscall(SYSCALL.setsockopt, sock_fd, SOL_SOCKET, SO_REUSEADDR, enable, 4n);
+    
+            write8(sockaddr_in + 1n, AF_INET);
+            write16(sockaddr_in + 2n, 0x3D23n);      // port 9021
+            write32(sockaddr_in + 4n, 0x0100007Fn);  // 127.0.0.1
+    
+            // Try to connect to 127.0.0.1:9021
+            const ret = syscall(SYSCALL.connect, sock_fd, sockaddr_in, 16n);
+    
+            if (ret === 0n) {
+                syscall(SYSCALL.close, sock_fd);
+                return true;
+            } else {
+                syscall(SYSCALL.close, sock_fd);
+                return false;
+            }
+        } catch (e) {
+            syscall(SYSCALL.close, sock_fd);
+            return false;
+        }
+    }
+}
+
+function check_jailbroken() {
+    if (!is_jailbroken()) {
+        throw new Error("process is not jailbroken")
+    }
+}
+
+function load_prx(path) {
+    const handle_out = malloc(4);
+    const path_addr = alloc_string(path);
+
+    const result = syscall(SYSCALL.dynlib_load_prx, path_addr, 0n, handle_out, 0n);
+    if (result !== 0n) {
+        throw new Error("dynlib_load_prx error: " + toHex(result));
+    }
+
+    return read32(handle_out);
+}
+
+function dlsym(handle, sym) {
+    if (Number(FW_VERSION) >= 5) {
+        check_jailbroken();
+    }
+
+    if (typeof sym !== "string") {
+        throw new Error("dlsym expect string symbol name");
+    }
+
+    const sym_addr = alloc_string(sym);
+    const addr_out = malloc(0x8n);
+
+    const result = syscall(SYSCALL.dlsym, BigInt(handle), sym_addr, addr_out);
+    if (result === 0xffffffffffffffffn) {
+        throw new Error("dlsym error: " + toHex(result));
+    }
+
+    return read64(addr_out);
+}
+
+function get_title_id() {
+    const sceKernelGetAppInfo = dlsym(LIBKERNEL_HANDLE, "sceKernelGetAppInfo");
+    const pid = syscall(SYSCALL.getpid);
+
+    const app_info = malloc(0x100n);
+    const result = call(sceKernelGetAppInfo, pid, app_info);
+    if (result !== 0n) {
+        throw new Error("sceKernelGetAppInfo error: " + hex(result));
+    }
+
+    return read_null_terminated_string(app_info + 0x10n);
+}
+
+function find_mod_by_name(name) {
+    const sceKernelGetModuleListInternal = dlsym(LIBKERNEL_HANDLE, "sceKernelGetModuleListInternal");
+    const sceKernelGetModuleInfo = dlsym(LIBKERNEL_HANDLE, "sceKernelGetModuleInfo");
+
+    const mem = malloc(4n * 0x300n);
+    const actual_num = malloc(0x8n);
+
+    call(sceKernelGetModuleListInternal, mem, 0x300n, actual_num);
+
+    const num = read64(actual_num);
+    for (let i = 0n; i < num; i++) {
+        const handle = read32(mem + i * 4n);
+        const info = malloc(0x160n);
+        write64(info, 0x160n);
+
+        call(sceKernelGetModuleInfo, handle, info);
+
+        const mod_name = read_null_terminated_string(info + 0x8n);
+        if (name === mod_name) {
+            const base_addr = read64(info + 0x108n);
+            return {
+                handle: handle,
+                base_addr: base_addr,
+            };
+        }
+    }
+
+    return null;
+}
+
+
+function file_exists(path) {
+    const path_addr = alloc_string(path);
+    const fd = syscall(SYSCALL.open, path_addr, O_RDONLY);
+    
+    if (fd !== 0xffffffffffffffffn) {
+        syscall(SYSCALL.close, fd);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function write_file(path, text) {
+    const mode = 0x1ffn; // 777
+    const path_addr = alloc_string(path);
+    const data_addr = alloc_string(text);
+
+    const flags = O_CREAT | O_WRONLY | O_TRUNC;
+    const fd = syscall(SYSCALL.open, path_addr, flags, mode);
+
+    if (fd === 0xffffffffffffffffn) {
+        throw new Error("open failed for " + path + " fd: " + toHex(fd));
+    }
+    
+    const written = syscall(SYSCALL.write, fd, data_addr, BigInt(text.length));
+    if (written === 0xffffffffffffffffn) {
+        syscall(SYSCALL.close, fd);
+        throw new Error("write failed : " + toHex(written));
+    }
+
+    syscall(SYSCALL.close, fd);
+    return Number(written); // number of bytes written
+}
+
+function get_nidpath() {
+    const path_buffer = malloc(0x255);
+    const len_ptr = malloc(8);
+    
+    write64(len_ptr, 0x255n);
+    
+    const ret = syscall(SYSCALL.randomized_path, 0n, path_buffer, len_ptr);
+    if (ret === 0xffffffffffffffffn) {
+        throw new Error("randomized_path failed : " + toHex(ret));        
+    }
+    
+    return read_null_terminated_string(path_buffer);
 }
 
