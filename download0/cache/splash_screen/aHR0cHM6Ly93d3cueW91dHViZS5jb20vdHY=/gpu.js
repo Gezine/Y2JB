@@ -3,6 +3,11 @@
 
 // GPU page table
 
+let sceKernelAllocateMainDirectMemory;
+let sceKernelMapDirectMemory;
+let sceGnmSubmitCommandBuffers;
+let sceGnmSubmitDone;
+
 const GPU_PDE_SHIFT = {
     VALID: 0,
     IS_PTE: 54,
@@ -99,13 +104,13 @@ gpu.dmem_size = 2n * 0x100000n; // 2MB
 gpu.setup = function() {
     check_kernel_rw();
     
-    const libSceGnmDriver = find_mod_by_name("libSceGnmDriverForNeoMode.sprx");
+    const libSceGnmDriver = load_prx("/system/common/lib/libSceGnmDriver.sprx");
     
     // Put these into global to make life easier
-    global.sceKernelAllocateMainDirectMemory = dlsym(LIBKERNEL_HANDLE, "sceKernelAllocateMainDirectMemory");
-    global.sceKernelMapDirectMemory = dlsym(LIBKERNEL_HANDLE, "sceKernelMapDirectMemory");
-    global.sceGnmSubmitCommandBuffers = dlsym(libSceGnmDriver.handle, "sceGnmSubmitCommandBuffers");
-    global.sceGnmSubmitDone = dlsym(libSceGnmDriver.handle, "sceGnmSubmitDone");
+    sceKernelAllocateMainDirectMemory = dlsym(LIBKERNEL_HANDLE, "sceKernelAllocateMainDirectMemory");
+    sceKernelMapDirectMemory = dlsym(LIBKERNEL_HANDLE, "sceKernelMapDirectMemory");
+    sceGnmSubmitCommandBuffers = dlsym(libSceGnmDriver, "sceGnmSubmitCommandBuffers");
+    sceGnmSubmitDone = dlsym(libSceGnmDriver, "sceGnmSubmitDone");
     
     const prot_ro = PROT_READ | PROT_WRITE | GPU_READ;
     const prot_rw = prot_ro | GPU_WRITE;
@@ -152,7 +157,7 @@ gpu.pm4_type3_header = function(opcode, count) {
         (predicate & 0x0n) |                      // Predicated version of packet when set
         ((shader_type & 0x1n) << 1n) |            // 0: Graphics, 1: Compute Shader
         ((opcode & 0xffn) << 8n) |        // IT opcode
-        (((count - 1) & 0x3fffn) << 16n) |  // Number of DWORDs - 1 in the information body
+        (((count - 1n) & 0x3fffn) << 16n) |  // Number of DWORDs - 1 in the information body
         ((packet_type & 0x3n) << 30n)             // Packet identifier. It should be 3 for type 3 packets
     );
     
@@ -161,7 +166,7 @@ gpu.pm4_type3_header = function(opcode, count) {
 
 gpu.pm4_dma_data = function(dest_va, src_va, length) {
     const count = 6n;
-    const bufsize = 4 * (count + 1);
+    const bufsize = Number(4n * (count + 1n));
     const opcode = 0x50n;
     const command_len = BigInt(length) & 0x1fffffn;
     

@@ -318,9 +318,7 @@ function load_prx(path) {
 }
 
 function dlsym(handle, sym) {
-    if (Number(FW_VERSION) >= 5) {
-        check_jailbroken();
-    }
+    check_jailbroken();
 
     if (typeof sym !== "string") {
         throw new Error("dlsym expect string symbol name");
@@ -329,9 +327,9 @@ function dlsym(handle, sym) {
     const sym_addr = alloc_string(sym);
     const addr_out = malloc(0x8n);
 
-    const result = syscall(SYSCALL.dlsym, BigInt(handle), sym_addr, addr_out);
+    const result = call(SCE_KERNEL_DLSYM, handle, sym_addr, addr_out);
     if (result === 0xffffffffffffffffn) {
-        throw new Error("dlsym error: " + toHex(result));
+        throw new Error("dlsym error");
     }
 
     return read64(addr_out);

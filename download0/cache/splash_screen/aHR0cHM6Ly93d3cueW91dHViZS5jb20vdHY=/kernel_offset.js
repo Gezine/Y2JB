@@ -1,70 +1,6 @@
 // Credit: @hammer-83
 // https://github.com/shahrilnet/remote_lua_loader/blob/main/savedata/kernel_offset.lua
 
-const offset_1_00_to_1_02 = {
-    DATA_BASE: 0x01B40000n,
-    DATA_SIZE: 0x08631930n,
-    DATA_BASE_DYNAMIC: 0x00000000n,
-    DATA_BASE_TO_DYNAMIC: 0x0658BB58n,
-    DATA_BASE_ALLPROC: 0x026D1BF8n,
-    DATA_BASE_SECURITY_FLAGS: 0x06241074n,
-    DATA_BASE_ROOTVNODE: 0x06565540n,
-    DATA_BASE_KERNEL_PMAP_STORE: 0x02F9F2B8n,
-    DATA_BASE_DATA_CAVE: 0x05F20000n,
-    DATA_BASE_GVMSPACE: 0x06202E70n,
-    PMAP_STORE_PML4PML4I: -0x1Cn,
-    PMAP_STORE_DMPML4I: 0x288n,
-    PMAP_STORE_DMPDPI: 0x28Cn,
-};
-
-const offset_1_05_to_1_14 = {
-    DATA_BASE: 0x01B40000n,
-    DATA_SIZE: 0x08631930n,
-    DATA_BASE_DYNAMIC: 0x00000000n,
-    DATA_BASE_TO_DYNAMIC: 0x0658BB58n,
-    DATA_BASE_ALLPROC: 0x026D1C18n,
-    DATA_BASE_SECURITY_FLAGS: 0x06241074n,
-    DATA_BASE_ROOTVNODE: 0x06565540n,
-    DATA_BASE_KERNEL_PMAP_STORE: 0x02F9F328n,
-    DATA_BASE_DATA_CAVE: 0x05F20000n,
-    DATA_BASE_GVMSPACE: 0x06202E70n,
-    PMAP_STORE_PML4PML4I: -0x1Cn,
-    PMAP_STORE_DMPML4I: 0x288n,
-    PMAP_STORE_DMPDPI: 0x28Cn,
-};
-
-const offset_2_00_to_2_70 = {
-    DATA_BASE: 0x01B80000n,
-    DATA_SIZE: 0x087E1930n,
-    DATA_BASE_DYNAMIC: 0x00000000n,
-    DATA_BASE_TO_DYNAMIC: 0x06739B88n,
-    DATA_BASE_ALLPROC: 0x02701C28n,
-    DATA_BASE_SECURITY_FLAGS: 0x063E1274n,
-    DATA_BASE_ROOTVNODE: 0x067134C0n,
-    DATA_BASE_KERNEL_PMAP_STORE: 0x031338C8n,
-    DATA_BASE_DATA_CAVE: 0x060C0000n,  // Use same as Specter's Byepervisor repo for interop
-    DATA_BASE_GVMSPACE: 0x063A2EB0n,
-    PMAP_STORE_PML4PML4I: -0x1Cn,
-    PMAP_STORE_DMPML4I: 0x288n,
-    PMAP_STORE_DMPDPI: 0x28Cn,
-};
-
-const offset_3_00_to_3_21 = {
-    DATA_BASE: 0x0BD0000n,
-    DATA_SIZE: 0x08871930n,
-    DATA_BASE_DYNAMIC: 0x00010000n,
-    DATA_BASE_TO_DYNAMIC: 0x067D1B90n,
-    DATA_BASE_ALLPROC: 0x0276DC58n,
-    DATA_BASE_SECURITY_FLAGS: 0x06466474n,
-    DATA_BASE_ROOTVNODE: 0x067AB4C0n,
-    DATA_BASE_KERNEL_PMAP_STORE: 0x031BE218n,
-    DATA_BASE_DATA_CAVE: 0x06140000n,  // Unconfirmed
-    DATA_BASE_GVMSPACE: 0x06423F80n,
-    PMAP_STORE_PML4PML4I: -0x1Cn,
-    PMAP_STORE_DMPML4I: 0x288n,
-    PMAP_STORE_DMPDPI: 0x28Cn,
-};
-
 const offset_4_00_to_4_51 = {
     DATA_BASE: 0x0C00000n,
     DATA_SIZE: 0x087B1930n,
@@ -211,25 +147,6 @@ const offset_10_00_to_10_01 = {
 
 // Map firmware versions to shared offset objects
 const ps5_kernel_offset_list = {
-    "1.00": offset_1_00_to_1_02,
-    "1.01": offset_1_00_to_1_02,
-    "1.02": offset_1_00_to_1_02,
-    "1.05": offset_1_05_to_1_14,
-    "1.10": offset_1_05_to_1_14,
-    "1.11": offset_1_05_to_1_14,
-    "1.12": offset_1_05_to_1_14,
-    "1.13": offset_1_05_to_1_14,
-    "1.14": offset_1_05_to_1_14,
-    "2.00": offset_2_00_to_2_70,
-    "2.20": offset_2_00_to_2_70,
-    "2.25": offset_2_00_to_2_70,
-    "2.26": offset_2_00_to_2_70,
-    "2.30": offset_2_00_to_2_70,
-    "2.50": offset_2_00_to_2_70,
-    "2.70": offset_2_00_to_2_70,
-    "3.00": offset_3_00_to_3_21,
-    "3.20": offset_3_00_to_3_21,
-    "3.21": offset_3_00_to_3_21,
     "4.00": offset_4_00_to_4_51,
     "4.02": offset_4_00_to_4_51,
     "4.03": offset_4_00_to_4_51,

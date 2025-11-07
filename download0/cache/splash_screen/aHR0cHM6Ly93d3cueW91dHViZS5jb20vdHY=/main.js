@@ -875,6 +875,11 @@ function trigger() {
         send_notification(version_string + "\nFW : " + FW_VERSION);
         await log("FW detected : " + FW_VERSION);
         
+        const major = FW_VERSION.split(".")[0];
+        SCE_KERNEL_DLSYM = libkernel_base + DLSYM_OFFSETS[major];
+        await log("libkernel_base @ " + toHex(libkernel_base));
+        await log("SCE_KERNEL_DLSYM @ " + toHex(SCE_KERNEL_DLSYM));
+        
         load_localscript('kernel.js');
         load_localscript('kernel_offset.js');
         load_localscript('gpu.js');

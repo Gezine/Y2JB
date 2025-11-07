@@ -34,6 +34,8 @@ let saved_fp = 0n;
 
 let FW_VERSION;
 
+let SCE_KERNEL_DLSYM;
+
 const PAGE_SIZE = 0x4000;
 const PHYS_PAGE_SIZE = 0x1000;
 
@@ -97,6 +99,16 @@ let ROP = {
     get mov_rax_0x200000000() { return eboot_base + 0x1283d40n; },
     get mov_rsp_rbp()         { return eboot_base + 0xb1424n;   },
     get ret()                 { return eboot_base + 0x32n;      },
+};
+
+const DLSYM_OFFSETS = {
+    "4": 0x317d0n,
+    "5": 0x342e0n,
+    "6": 0x330a0n,
+    "7": 0x2ca80n,
+    "8": 0x2bc70n,
+    "9": 0x2d2f0n,
+    "10": 0x2cf40n
 };
 
 let SYSCALL = {
