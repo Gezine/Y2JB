@@ -127,7 +127,7 @@
             const client_fd = syscall(SYSCALL.accept, sock_fd, sockaddr_in, addrlen);
 
             if (client_fd === 0xffffffffffffffffn) {
-                await log("accept() failed: " + toHex(client_fd) + " - recreating socket");
+                //await log("accept() failed: " + toHex(client_fd) + " - recreating socket");
                 syscall(SYSCALL.close, sock_fd);
 
                 const recreated = await recreate_socket();
@@ -137,7 +137,7 @@
                 continue;
             }
 
-            await log("Client connected, fd: " + Number(client_fd));
+            //await log("Client connected, fd: " + Number(client_fd));
 
             let total_read = 0;
             let read_error = false;
@@ -160,10 +160,10 @@
                 }
 
                 total_read += n;
-                await log("Read " + n + " bytes");
+                //await log("Read " + n + " bytes");
             }
 
-            await log("Finished reading, total=" + total_read + " error=" + read_error);
+            //await log("Finished reading, total=" + total_read + " error=" + read_error);
 
             if (read_error || total_read === 0) {
                 await log("No valid data received");
@@ -177,12 +177,13 @@
             }
 
             const js_code = decoder.decode(bytes);
+            
+            syscall(SYSCALL.close, client_fd);
 
             await log("Executing payload...");
             await eval(js_code);
             await log("Executed successfully");
-
-            syscall(SYSCALL.close, client_fd);
+            
             await log("Connection closed");
 
         } catch (e) {
