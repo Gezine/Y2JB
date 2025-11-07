@@ -427,3 +427,9 @@ function get_nidpath() {
     return read_null_terminated_string(path_buffer);
 }
 
+function nanosleep(nsec) {
+    const timespec = malloc(0x10);
+    write64(timespec, BigInt(Math.floor(nsec / 1e9)));    // tv_sec
+    write64(timespec + 8n, BigInt(nsec % 1e9));           // tv_nsec
+    syscall(SYSCALL.nanosleep, timespec);
+}

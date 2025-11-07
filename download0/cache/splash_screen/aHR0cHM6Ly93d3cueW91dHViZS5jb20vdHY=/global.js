@@ -101,7 +101,7 @@ let ROP = {
     get ret()                 { return eboot_base + 0x32n;      },
 };
 
-const DLSYM_OFFSETS = {
+let DLSYM_OFFSETS = {
     "4": 0x317d0n,
     "5": 0x342e0n,
     "6": 0x330a0n,

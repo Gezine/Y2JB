@@ -1,6 +1,6 @@
 // https://github.com/shahrilnet/remote_lua_loader/blob/main/savedata/kernel.lua
 
-const kernel = {
+let kernel = {
     addr: {},
     copyout: null,
     copyin: null,

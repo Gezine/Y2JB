@@ -97,7 +97,7 @@ function gpu_walk_pt(vmid, virt_addr) {
 
 // Kernel r/w primitives based on GPU DMA
 
-const gpu = {};
+let gpu = {};
 
 gpu.dmem_size = 2n * 0x100000n; // 2MB
 
@@ -214,9 +214,6 @@ gpu.submit_dma_data_command = function(dest_va, src_va, size) {
     if (ret !== 0n) {
         throw new Error("sceGnmSubmitCommandBuffers() error: " + toHex(ret));
     }
-    
-    // Note: sleep commented out - not available in JS
-    // sleep(1);
     
     // Inform GPU that current submission is done
     const ret2 = call(sceGnmSubmitDone);
