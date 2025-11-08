@@ -883,6 +883,15 @@ function trigger() {
             await log("WARNING : No dlsym offset was found for firmware " + FW_VERSION);
         }
         
+        // Used for gpu rw
+        sceKernelAllocateMainDirectMemory = read64(eboot_base + 0x2A65EF8n);
+        // Same thing with sceKernelMapDirectMemory but with name assigning.
+        // Using this because don't want to use dlsym
+        sceKernelMapNamedDirectMemory = read64(eboot_base + 0x2A65F00n); 
+        
+        //sceAgcDriverSubmitDcb = read64(eboot_base + 0x2A66790n);
+        //sceAgcDcbDmaData = read64(eboot_base + 0x2A66868n);
+        
         load_localscript('kernel.js');
         load_localscript('kernel_offset.js');
         load_localscript('gpu.js');

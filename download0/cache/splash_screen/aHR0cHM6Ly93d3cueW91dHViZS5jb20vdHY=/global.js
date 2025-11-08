@@ -32,6 +32,11 @@ let fake_frame;
 let return_value_buf;
 let saved_fp = 0n;
 
+let sceKernelAllocateMainDirectMemory;
+let sceKernelMapNamedDirectMemory; 
+//let sceAgcDriverSubmitDcb;
+//let sceAgcDcbDmaData;
+
 let FW_VERSION;
 
 let SCE_KERNEL_DLSYM = 0n;
@@ -185,4 +190,5 @@ let SYSCALL = {
     thr_new: 0x1c7n,
     thr_exit: 0x1afn,
     fsync: 0x5fn,
+    ioctl: 0x36n
 };
