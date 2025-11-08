@@ -34,7 +34,7 @@ let saved_fp = 0n;
 
 let FW_VERSION;
 
-let SCE_KERNEL_DLSYM;
+let SCE_KERNEL_DLSYM = 0n;
 
 const PAGE_SIZE = 0x4000;
 const PHYS_PAGE_SIZE = 0x1000;
@@ -102,13 +102,31 @@ let ROP = {
 };
 
 let DLSYM_OFFSETS = {
-    "4": 0x317d0n,
-    "5": 0x342e0n,
-    "6": 0x330a0n,
-    "7": 0x2ca80n,
-    "8": 0x2bc70n,
-    "9": 0x2d2f0n,
-    "10": 0x2cf40n
+    "4.03": 0x357D0n,
+    "4.50": 0x357D0n,
+    "4.51": 0x357D0n,
+    "5.02": 0x36160n,
+    "5.10": 0x36160n,
+    "5.50": 0x36230n,
+    "6.00": 0x370A0n,
+    "6.02": 0x370A0n,
+    "6.50": 0x37110n,
+    "7.00": 0x37E90n,
+    "7.01": 0x37E90n,
+    "7.20": 0x37ED0n,
+    "7.40": 0x37ED0n,
+    "7.60": 0x37ED0n,
+    "7.61": 0x37ED0n,
+    "8.00": 0x382E0n,
+    "8.20": 0x382E0n,
+    "8.40": 0x382E0n,
+    "8.60": 0x382E0n,
+    "9.00": 0x390E0n,
+    "9.20": 0x390E0n,
+    "9.40": 0x390E0n,
+    "9.60": 0x390E0n,
+    "10.00": 0x389C0n,
+    "10.01": 0x389C0n
 };
 
 let SYSCALL = {

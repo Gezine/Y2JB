@@ -319,6 +319,9 @@ function load_prx(path) {
 
 function dlsym(handle, sym) {
     check_jailbroken();
+    if (SCE_KERNEL_DLSYM === 0n) {
+        throw new Error("dlsym offset not available for firmware " + FW_VERSION);
+    }
 
     if (typeof sym !== "string") {
         throw new Error("dlsym expect string symbol name");
@@ -432,4 +435,41 @@ function nanosleep(nsec) {
     write64(timespec, BigInt(Math.floor(nsec / 1e9)));    // tv_sec
     write64(timespec + 8n, BigInt(nsec % 1e9));           // tv_nsec
     syscall(SYSCALL.nanosleep, timespec);
+}
+
+
+function get_dlsym_offset(fw_version) {
+    const [major, minor] = fw_version.split(".").map(Number);
+    
+    // Try exact match first
+    const version_key = `${major}.${minor.toString().padStart(2, '0')}`;
+    if (DLSYM_OFFSETS[version_key]) {
+        return DLSYM_OFFSETS[version_key];
+    }
+    
+    // Find closest version within same major
+    const available_versions = Object.keys(DLSYM_OFFSETS)
+        .filter(v => v.startsWith(`${major}.`))
+        .map(v => ({
+            key: v,
+            minor: parseInt(v.split(".")[1])
+        }));
+    
+    if (available_versions.length === 0) {
+        throw new Error("No dlsym offset found for firmware version " + fw_version);
+    }
+    
+    // Find version with minimum distance to current minor
+    let closest = available_versions[0];
+    let min_distance = Math.abs(closest.minor - minor);
+    
+    for (let version of available_versions) {
+        const distance = Math.abs(version.minor - minor);
+        if (distance < min_distance) {
+            min_distance = distance;
+            closest = version;
+        }
+    }
+    
+    return DLSYM_OFFSETS[closest.key];
 }
