@@ -157,6 +157,9 @@ gpu.ioctl_wait_done = function() {
     //if (ret !== 0n) {
     //    throw new Error("ioctl wait_done failed: " + toHex(ret));
     //}
+    
+    // Manual sleep - temp fix
+    nanosleep(1000000000);
 };
 
 gpu.setup = function() {
