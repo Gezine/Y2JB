@@ -27,7 +27,7 @@
     try {
         const lapse_version = "Y2JB Lapse 1.0 beta by Gezine";
         
-        const failcheck_path = "/" + get_nidpath() + "/common_temp/lapse.fail";
+        let failcheck_path;
 
         const MAIN_CORE = 4;
         const MAIN_RTPRIO = 0x100;
@@ -1674,7 +1674,7 @@
             // init GPU DMA for kernel r/w on protected area
             await gpu.setup();
 
-            const force_kdata_patch_with_gpu = false;
+            const force_kdata_patch_with_gpu = true;
             const fw_version_num = Number(FW_VERSION);
 
             if (fw_version_num >= 7 || force_kdata_patch_with_gpu) {
@@ -1774,16 +1774,22 @@
         ////////////////////
         
         try {
-            if(is_jailbroken()) {
-                await log("Already Jailbroken");
-                send_notification("Already Jailbroken");
-                return;
+            if (sceKernelMapNamedDirectMemory != null) {
+                if(is_jailbroken()) {
+                    await log("Already Jailbroken");
+                    send_notification("Already Jailbroken");
+                    return;
+                }                
+            } else {
+                throw new Error();
             }
         } catch (e) {
             await log("Not supported Y2JB\nUpdate Y2JB to at least 1.2 stable");
             send_notification("Not supported Y2JB\nUpdate Y2JB to at least 1.2 stable");
             return;
         }
+        
+        failcheck_path = "/" + get_nidpath() + "/common_temp/lapse.fail";
 
         if(rerun_check()) {
             await log("Restart your PS5 to run Lapse again");
