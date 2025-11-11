@@ -889,8 +889,8 @@ function trigger() {
         // Using this because don't want to use dlsym
         sceKernelMapNamedDirectMemory = read64(eboot_base + 0x2A65F00n); 
         
-        //sceAgcDriverSubmitDcb = read64(eboot_base + 0x2A66790n);
-        //sceAgcDcbDmaData = read64(eboot_base + 0x2A66868n);
+        Thrd_create = libc_base + 0x4BF0n;
+        Thrd_join = libc_base + 0x49F0n;
         
         load_localscript('kernel.js');
         load_localscript('kernel_offset.js');

