@@ -17,7 +17,33 @@ Userland code execution using the PS5 YouTube app.
 
 ## Setup Instructions
 
-0. Set your PS5 network DNS to 127.0.0.2 (Or block www.youtube.com from your custom DNS)
+### Configure Network DNS Settings
+
+1. Navigate to **Settings > Network > Settings > Set Up Internet Connection**
+2. Scroll to the bottom and select **Set Up Manually**
+3. Choose your connection type:
+   - **Use WiFi**: Enter network name and password manually, set security to "WPA-Personal..."
+   - **Use a LAN Cable**: Proceed to next step
+4. Under **DNS Settings**, change from "Automatic" to **Manual**
+5. Set **Primary DNS** to `127.0.0.2` (leave Secondary DNS blank)
+6. Press **Done** and wait for the connection to establish
+
+**Note:** You may see a network/PSN connection error - this is expected and can be ignored. The console will still function normally for YouTube payload delivery.
+
+**Alternative:** Block PSN servers and `www.youtube.com` from your custom DNS server instead of using 127.0.0.2
+
+### Fake Account Activation
+
+**Note:** If you're using the backup file from the releases page, you can skip this section.
+
+You need a **fake-activated account** to run Y2JB properly.
+
+**If you have a legit PSN-activated account:** This means your account is officially registered and activated through PlayStation Network. You cannot use this account directly with Y2JB - you must create and use a separate fake-activated account instead.
+
+**To fake activate an account:**
+1. Open **etaHEN toolbox** while logging in to created new offline account
+2. Navigate to the **"Remote Play"** menu
+3. The account will be automatically fake activated
 
 ### Jailbroken PS5
 
@@ -36,8 +62,15 @@ Userland code execution using the PS5 YouTube app.
 
 ## Credits
 
-* **shahrilnet, null_ptr** - Referenced many codes from [Remote Lua Loader](https://github.com/shahrilnet/remote_lua_loader)
-* **ntfargo** - Thanks for providing V8 CVEs and CTF writeups
+* **[shahrilnet](https://github.com/shahrilnet), [null_ptr](https://github.com/n0llptr)** - Referenced many codes from [Remote Lua Loader](https://github.com/shahrilnet/remote_lua_loader)
+* **[ntfargo](https://github.com/ntfargo)** - Thanks for providing V8 CVEs and CTF writeups
+* **abc and psfree team** - Lapse implementation
+* **[flat_z](https://github.com/flatz) and [LM](https://github.com/LightningMods)** - Helping implement GPU rw using direct ioctl
+* **[john-tornblom](https://github.com/john-tornblom) and [EchoStretch](https://github.com/EchoStretch)** - Providing elfldr.elf payload
+* **[hammer-83](https://github.com/hammer-83)** - Various BD-J PS5 exploit references
+* **[zecoxao](https://github.com/zecoxao), [idlesauce](https://github.com/idlesauce), and [TheFlow](https://github.com/theofficialflow)** - Helping troubleshoot dlsym
+* **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB
+* **Rush** - Creating Y2JB backup file
 
 ## Disclaimer
 
