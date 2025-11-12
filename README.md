@@ -60,6 +60,38 @@ You need a **fake-activated account** to run Y2JB properly.
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
 **Note: Restoring backup WILL FACTORY RESET YOUR PS5**
 
+## Sending Payloads
+
+**Note:** The Remote JS Server does not always run on port 50000. Most of the time it will use port 50000, but rarely it may use a different port - this is not a bug.
+
+Payloads can be sent using `payload_sender.py` with Python installed.
+
+**Usage:**
+```
+python payload_sender.py <host> <file>
+python payload_sender.py <host> <port> <file>
+```
+
+**Examples:**
+```
+python payload_sender.py 192.168.1.100 helloworld.js
+python payload_sender.py 192.168.1.100 50000 helloworld.js
+python payload_sender.py 192.168.1.100 9020 payload.bin
+```
+
+### Lapse Payload
+
+**Firmware Compatibility:** Only works up to firmware 10.01
+
+After the Lapse payload succeeds, you need to send the HEN or other elf binary to port **9021**. You can use any TCP payload sender such as:
+- `netcat`
+- `payload_sender.py`
+
+**Example:**
+```
+python payload_sender.py 192.168.1.100 9021 hen.bin
+```
+
 ## Credits
 
 * **[shahrilnet](https://github.com/shahrilnet), [null_ptr](https://github.com/n0llptr)** - Referenced many codes from [Remote Lua Loader](https://github.com/shahrilnet/remote_lua_loader)
