@@ -84,6 +84,7 @@ const O_APPEND = 0x8n;
 const O_NONBLOCK = 0x4n;
 
 const SIGILL = 4n;
+const SIGKILL = 9n;
 const SIGBUS = 10n;
 const SIGSEGV = 11n;
 const SA_SIGINFO = 0x4n;
@@ -191,5 +192,6 @@ let SYSCALL = {
     thr_new: 0x1c7n,
     thr_exit: 0x1afn,
     fsync: 0x5fn,
-    ioctl: 0x36n
+    ioctl: 0x36n,
+    kill: 0x25n
 };

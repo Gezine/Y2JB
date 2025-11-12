@@ -5,7 +5,7 @@
     let sym_addr = alloc_string("sceKernelAllocateMainDirectMemory");
     let addr_out = malloc(0x10);
     
-    let result = syscall(0x24fn, LIBKERNEL_HANDLE, sym_addr, addr_out);
+    let result = syscall(SYSCALL.dlsym, LIBKERNEL_HANDLE, sym_addr, addr_out);
     if (result === 0xffffffffffffffffn) {
         await log("dlsym error: " + get_error_string());
     }

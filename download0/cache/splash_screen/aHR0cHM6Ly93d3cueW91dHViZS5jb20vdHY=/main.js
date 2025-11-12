@@ -5,15 +5,21 @@
     of the MIT license.  See the LICENSE file for details.
 */
 
-const version_string = "Y2JB 1.2 beta by Gezine";
+const version_string = "Y2JB 1.2 by Gezine";
 
-function load_localscript(filename) {
-    const script = document.createElement('script');
-    script.src = filename;
-    document.head.appendChild(script);
+function load_localscript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
 }
 
-load_localscript('global.js');
+(async function() {
+    await load_localscript('global.js');
+})();
 
 let NETWORK_LOGGING = false;
 // Use setlogserver.js payload to change server url at runtime
@@ -858,7 +864,7 @@ function trigger() {
         libc_strerror = libc_base + 0x73520n;
         libc_error = libc_base + 0xCC5A0n;
         
-        load_localscript('misc.js');
+        await load_localscript('misc.js');
         
         if (psn_matches >= 1 && yt_matches >= 1) {
             send_notification("PSN dialog disabled\nSafe to close PSN sign out dialog now");
@@ -892,15 +898,16 @@ function trigger() {
         Thrd_create = libc_base + 0x4BF0n;
         Thrd_join = libc_base + 0x49F0n;
         
-        load_localscript('kernel.js');
-        load_localscript('kernel_offset.js');
-        load_localscript('gpu.js');
+        await load_localscript('kernel.js');
+        await load_localscript('kernel_offset.js');
+        await load_localscript('gpu.js');
+        await load_localscript('elf_loader.js');
         
         ////////////////////
         // MAIN EXECUTION //
         ////////////////////
         
-        load_localscript('remotejsloader.js');
+        await load_localscript('remotejsloader.js');
         
     } catch (e) {                
         await log('EXCEPTION: ' + e.message);

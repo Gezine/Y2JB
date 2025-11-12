@@ -503,3 +503,7 @@ function get_dlsym_offset(fw_version) {
     return DLSYM_OFFSETS[closest.key];
 }
 
+function kill_youtube() {
+    const pid = syscall(SYSCALL.getpid);
+    syscall(SYSCALL.kill, pid, SIGKILL);
+}

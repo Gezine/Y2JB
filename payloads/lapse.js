@@ -25,7 +25,7 @@
 
 (async function() {
     try {
-        const lapse_version = "Y2JB Lapse 1.0 beta by Gezine";
+        const lapse_version = "Y2JB Lapse 1.0 by Gezine";
         
         let failcheck_path;
 
@@ -1768,7 +1768,7 @@
         ////////////////////
         
         try {
-            if (sceKernelMapNamedDirectMemory != null) {
+            if(kill_youtube) {
                 if(is_jailbroken()) {
                     await log("Already Jailbroken");
                     send_notification("Already Jailbroken");
@@ -1892,10 +1892,14 @@
                 throw e;
             }
             
+            await elf_loader();
+            
             await cleanup();
             
-            await log("Lapse finished");
-            send_notification("Lapse finished");
+            await log("Lapse finished\nClosing Y2JB...");
+            send_notification("Lapse finished\nClosing Y2JB...");
+            
+            kill_youtube();
             
         } catch (e) {
             await log("Lapse error: " + e.message);

@@ -185,8 +185,7 @@ async function elf_wait_for_exit(thr_handle, payloadout) {
     await log("out = " + toHex(out));
 }
 
-
-(async function() {
+async function elf_loader() {
     try {
         check_jailbroken();
         
@@ -214,4 +213,4 @@ async function elf_wait_for_exit(thr_handle, payloadout) {
         await log("Error: " + e.message);
         throw e;
     }
-})();
+}
