@@ -80,6 +80,7 @@ This script prevents YouTube from updating if you accidentally connect to the in
 6. If you do not receive any database corruption notification, reboot your PS5
 
 ### How to escape from youtube softlock
+![youtube_softlock](https://github.com/user-attachments/assets/62012e7f-e004-4e20-8c18-bd7d0bbd72b1)
 
 This can happen when user (mostly wifi) connects to the internet **before** setting 127.0.0.2 DNS.
 
