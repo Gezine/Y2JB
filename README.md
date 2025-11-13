@@ -60,6 +60,37 @@ You need a **fake-activated account** to run Y2JB properly.
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
 **Note: Restoring backup WILL FACTORY RESET YOUR PS5**
 
+### Blocking YouTube Updates (appinfo_editor.py)
+
+**Note:** If you're using the backup file version 1.2.1 or higher from the releases page, you can skip this section.
+
+This script prevents YouTube from updating if you accidentally connect to the internet, which can cause softlock preventing YouTube from launching (for fix go to next section).
+
+1. After installing the YouTube PKG, retrieve `/system_data/priv/mms/appinfo.db` from your PS5 using FTP
+2. Place `appinfo.db` in the same directory as `appinfo_editor.py`
+3. Run the script. This modifies `appinfo.db` to block YouTube updates:
+   ```
+   python appinfo_editor.py
+   ```
+4. To avoid database corruption when replacing the file:
+   - Close the YouTube app
+   - Navigate to the Settings page
+   - Ensure no packages are being installed or updated
+5. Use FTP to replace `/system_data/priv/mms/appinfo.db` with the modified version
+6. If you do not receive any database corruption notification, reboot your PS5
+
+### How to escape from youtube softlock
+
+This can happen when user (mostly wifi) connects to the internet **before** setting 127.0.0.2 DNS.
+
+1. Once you get softlock, first connect to the internet normally without custom DNS
+2. Launch YouTube again and deny the system software update popup
+3. Now it will let you run YouTube
+4. Run the jailbreak and load HEN
+5. Now set 127.0.0.2 DNS again and uninstall YouTube
+6. Follow **Jailbroken PS5** section and **Blocking YouTube Updates (appinfo_editor.py)** section again
+7. Restart PS5. Done.
+
 ## Sending Payloads
 
 **Note:** The Remote JS Server does not always run on port 50000. Most of the time it will use port 50000, but rarely it may use a different port - this is not a bug.
