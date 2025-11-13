@@ -22,28 +22,37 @@ Userland code execution using the PS5 YouTube app.
 1. Navigate to **Settings > Network > Settings > Set Up Internet Connection**
 2. Scroll to the bottom and select **Set Up Manually**
 3. Choose your connection type:
-   - **Use WiFi**: Enter network name and password manually, set security to "WPA-Personal..."
-   - **Use a LAN Cable**: Proceed to next step
+   - **Use WiFi**: Enter your network name and password manually, then set security to "WPA-Personal..."
+   - **Use a LAN Cable**: Proceed to the next step
 4. Under **DNS Settings**, change from "Automatic" to **Manual**
 5. Set **Primary DNS** to `127.0.0.2` (leave Secondary DNS blank)
 6. Press **Done** and wait for the connection to establish
 
-**Note:** You may see a network/PSN connection error - this is expected and can be ignored. The console will still function normally for YouTube payload delivery.
+**Note:** You may see a network/PSN connection error - this is expected and can be safely ignored. The console will still function normally for YouTube payload delivery.
 
-**Alternative:** Block PSN servers and `www.youtube.com` from your custom DNS server instead of using 127.0.0.2
+**Alternative:** Instead of using 127.0.0.2, you can block PSN servers and `www.youtube.com` from your custom DNS server.
+
+#### Why is Setting DNS to 127.0.0.2 Required?
+
+The DNS configuration is critical for Y2JB to function properly for two technical reasons:
+
+1. **Blocking PSN Connections**: Setting the DNS to 127.0.0.2 (localhost) prevents the PS5 from reaching PlayStation Network servers. This blocks both the YouTube app and system firmware update prompts that would otherwise interfere with the exploit.
+
+2. **Preventing YouTube App Connection**: The YouTube app must be prevented from connecting to `www.youtube.com`. If the domain resolves successfully, the exploit will run but the YouTube app will kill it after approximately 2 seconds and replace it with the normal YouTube page. While Y2JB includes a built-in patch to prevent this behavior, the patch is not perfect. Therefore, blocking `www.youtube.com` via DNS is still recommended to ensure reliable exploit execution.
 
 ### Fake Account Activation
 
 **Note:** If you're using the backup file from the releases page, you can skip this section.
 
-You need a **fake-activated account** to run Y2JB properly.
+Y2JB requires a **fake-activated account** to run properly.
 
-**If you have a legit PSN-activated account:** This means your account is officially registered and activated through PlayStation Network. You cannot use this account directly with Y2JB - you must create and use a separate fake-activated account instead.
+**Important:** If you have a legit PSN-activated account (officially registered through PlayStation Network), you **cannot** use it directly with Y2JB. You must create and use a separate fake-activated account instead.
 
 **To fake activate an account:**
-1. Open **etaHEN toolbox** while logging in to created new offline account
-2. Navigate to the **"Remote Play"** menu
-3. The account will be automatically fake activated
+1. Create a new offline account on your PS5
+2. While logging in to this new account, open **etaHEN toolbox**
+3. Navigate to the **"Remote Play"** menu
+4. The account will be automatically fake activated
 
 ### Jailbroken PS5
 
@@ -57,46 +66,51 @@ You need a **fake-activated account** to run Y2JB properly.
 ### Non-Jailbroken PS5
 
 1. Download the backup file from the releases page
-2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
-**Note: Restoring backup WILL FACTORY RESET YOUR PS5**
+2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)
+
+**⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
 
 ### Blocking YouTube Updates (appinfo_editor.py)
 
-**Note:** If you're using the backup file version 1.2.1 or higher from the releases page, you can skip this section.
+**Note:** If you're using backup file version 1.2.1 or higher from the releases page, you can skip this section.
 
-This script prevents YouTube from updating if you accidentally connect to the internet, which can cause softlock preventing YouTube from launching (for fix go to next section).
+**⚠️ CRITICAL WARNING:** Database corruption can result in the deletion of **ALL installed FPKGs and savedata** stored on your internal storage. Before proceeding with this section, **backup your savedata** using the PS5's built-in backup and restore feature in Settings to prevent data loss.
 
+This script prevents the YouTube app from updating if you accidentally connect to the internet. Allowing updates can cause a softlock that prevents YouTube from launching (see next section for fix instructions).
+
+**Steps:**
 1. After installing the YouTube PKG, retrieve `/system_data/priv/mms/appinfo.db` from your PS5 using FTP
 2. Place `appinfo.db` in the same directory as `appinfo_editor.py`
-3. Run the script. This modifies `appinfo.db` to block YouTube updates:
+3. Run the script to modify `appinfo.db` and block YouTube updates:
    ```
    python appinfo_editor.py
    ```
-4. To avoid database corruption when replacing the file:
-   - Close the YouTube app
+4. **Before replacing the file** on your PS5 (to avoid database corruption):
+   - Close the YouTube app completely
    - Navigate to the Settings page
-   - Ensure no packages are being installed or updated
+   - Ensure no packages are currently being installed or updated
 5. Use FTP to replace `/system_data/priv/mms/appinfo.db` with the modified version
-6. If you do not receive any database corruption notification, reboot your PS5
+6. If you don't receive any database corruption notification, reboot your PS5
 
-### How to escape from youtube softlock
+### How to Escape from YouTube Softlock
 ![youtube_softlock](https://github.com/user-attachments/assets/62012e7f-e004-4e20-8c18-bd7d0bbd72b1)
 
-This can happen when user (mostly wifi) connects to the internet **before** setting 127.0.0.2 DNS.
+This issue typically occurs when you connect to the internet **before** setting the 127.0.0.2 DNS (most common with WiFi users).
 
-1. Once you get softlock, first connect to the internet normally without custom DNS
+**Recovery steps:**
+1. Once softlocked, connect to the internet normally without custom DNS
 2. Launch YouTube again and deny the system software update popup
-3. Now it will let you run YouTube
+3. The YouTube app should now launch successfully
 4. Run the jailbreak and load HEN
-5. Now set 127.0.0.2 DNS again and uninstall YouTube
-6. Follow **Jailbroken PS5** section and **Blocking YouTube Updates (appinfo_editor.py)** section again
-7. Restart PS5. Done.
+5. Set the DNS to 127.0.0.2 again, then uninstall YouTube
+6. Follow the **Jailbroken PS5** section and **Blocking YouTube Updates (appinfo_editor.py)** section again
+7. Restart your PS5. Done.
 
 ## Sending Payloads
 
-**Note:** The Remote JS Server does not always run on port 50000. Most of the time it will use port 50000, but rarely it may use a different port - this is not a bug.
+**Note:** The Remote JS Server does not always use port 50000. While it typically defaults to port 50000, it may occasionally use a different port - this is normal behavior, not a bug.
 
-Payloads can be sent using `payload_sender.py` with Python installed.
+You can send payloads using `payload_sender.py` (requires Python).
 
 **Usage:**
 ```
