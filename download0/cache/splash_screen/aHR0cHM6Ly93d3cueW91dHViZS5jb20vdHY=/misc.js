@@ -79,7 +79,9 @@ function sysctlbyname(name, oldp, oldp_len, newp, newp_len) {
         throw new Error("failed to translate sysctl name to mib (" + name + ")");
     }
     
-    if (syscall(SYSCALL.sysctl, mib, 2n, oldp, oldp_len, newp, newp_len) === 0xffffffffffffffffn) {
+    let mib_len = read64(size) / 4n
+    
+    if (syscall(SYSCALL.sysctl, mib, mib_len, oldp, oldp_len, newp, newp_len) === 0xffffffffffffffffn) {
         return false;
     }
     
@@ -503,7 +505,69 @@ function get_dlsym_offset(fw_version) {
     return DLSYM_OFFSETS[closest.key];
 }
 
-function kill_youtube() {
-    const pid = syscall(SYSCALL.getpid);
-    syscall(SYSCALL.kill, pid, SIGKILL);
+async function send_network(ip_address, port, sock_type, buffer) {
+    const sockaddr_in = malloc(16);
+    const buf_ptr = malloc(buffer.length);
+    
+    // Copy buffer to memory
+    for (let i = 0; i < buffer.length; i++) {
+        write8(buf_ptr + BigInt(i), buffer[i]);
+    }
+    
+    // Create socket (SOCK_STREAM or SOCK_DGRAM)
+    const sock_fd = syscall(SYSCALL.socket, AF_INET, sock_type, 0n);
+    if (sock_fd === 0xffffffffffffffffn) {
+        throw new Error("Socket creation failed");
+    }
+    
+    // Parse IP address (e.g., "127.0.0.1" -> 0x0100007f)
+    const ip_parts = ip_address.split('.').map(Number);
+    const ip_addr = (ip_parts[0]) | (ip_parts[1] << 8) | (ip_parts[2] << 16) | (ip_parts[3] << 24);
+    
+    // Setup address
+    for (let i = 0; i < 16; i++) write8(sockaddr_in + BigInt(i), 0);
+    write8(sockaddr_in + 1n, AF_INET);
+    write16(sockaddr_in + 2n, (port << 8) | (port >> 8)); // port in network byte order
+    write32(sockaddr_in + 4n, ip_addr);
+    
+    if (sock_type === SOCK_STREAM) {
+        // TCP: Connect then send
+        const conn_ret = syscall(SYSCALL.connect, sock_fd, sockaddr_in, 16n);
+        if (conn_ret === 0xffffffffffffffffn) {
+            syscall(SYSCALL.close, sock_fd);
+            throw new Error("Connect failed");
+        }
+        
+        const write_ret = syscall(SYSCALL.write, sock_fd, buf_ptr, BigInt(buffer.length));
+        if (write_ret === 0xffffffffffffffffn) {
+            syscall(SYSCALL.close, sock_fd);
+            throw new Error("Write failed");
+        }
+    } else {
+        // UDP: Use sendto
+        const send_ret = syscall(SYSCALL.sendto, sock_fd, buf_ptr, BigInt(buffer.length), 0n, sockaddr_in, 16n);
+        if (send_ret === 0xffffffffffffffffn) {
+            syscall(SYSCALL.close, sock_fd);
+            throw new Error("Sendto failed");
+        }
+    }
+    
+    syscall(SYSCALL.close, sock_fd);
+}
+
+async function kill_youtube() {
+    try {
+        check_jailbroken();
+        
+        const killyoutube_download0_path = "/mnt/sandbox/" + get_title_id() + "_000/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/kill_youtube.elf";
+        
+        const file_data = await read_file(killyoutube_download0_path);
+        if (!file_data) {
+            throw new Error("Failed to read file");
+        }
+        
+        await send_network("127.0.0.1", 9021, SOCK_STREAM, file_data);
+    } catch (e) {
+        await log("ERROR in kill_youtube: " + e.message);
+    }
 }

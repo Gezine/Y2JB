@@ -17,7 +17,7 @@ Userland code execution using the PS5 YouTube app.
 
 ## Setup Instructions
 
-### Configure Network DNS Settings
+### Configure Network DNS Settings (Optional, but highly recommended)
 
 1. Navigate to **Settings > Network > Settings > Set Up Internet Connection**
 2. Scroll to the bottom and select **Set Up Manually**
@@ -30,15 +30,13 @@ Userland code execution using the PS5 YouTube app.
 
 **Note:** You may see a network/PSN connection error - this is expected and can be safely ignored. The console will still function normally for YouTube payload delivery.
 
-**Alternative:** Instead of using 127.0.0.2, you can block PSN servers and `www.youtube.com` from your custom DNS server.
+**Alternative:** Instead of using 127.0.0.2, you can block PSN servers using your custom DNS server.
 
 #### Why is Setting DNS to 127.0.0.2 Required?
 
 The DNS configuration is critical for Y2JB to function properly for two technical reasons:
 
 1. **Blocking PSN Connections**: Setting the DNS to 127.0.0.2 (localhost) prevents the PS5 from reaching PlayStation Network servers. This blocks both the YouTube app and system firmware update prompts that would otherwise interfere with the exploit.
-
-2. **Preventing YouTube App Connection**: The YouTube app must be prevented from connecting to `www.youtube.com`. If the domain resolves successfully, the exploit will run but the YouTube app will kill it after approximately 2 seconds and replace it with the normal YouTube page. While Y2JB includes a built-in patch to prevent this behavior, the patch is not perfect. Therefore, blocking `www.youtube.com` via DNS is still recommended to ensure reliable exploit execution.
 
 ### Fake Account Activation
 
@@ -141,6 +139,7 @@ python payload_sender.py 192.168.1.100 9021 hen.bin
 ## Credits
 
 * **[shahrilnet](https://github.com/shahrilnet), [null_ptr](https://github.com/n0llptr)** - Referenced many codes from [Remote Lua Loader](https://github.com/shahrilnet/remote_lua_loader)
+* **[BenNoxXD](https://github.com/BenNoxXD)** - [ClosePlayer](https://github.com/BenNoxXD/PS5-BDJ-HEN-loader) reference
 * **[ntfargo](https://github.com/ntfargo)** - Thanks for providing V8 CVEs and CTF writeups
 * **abc and psfree team** - Lapse implementation
 * **[flat_z](https://github.com/flatz) and [LM](https://github.com/LightningMods)** - Helping implement GPU rw using direct ioctl
@@ -152,4 +151,6 @@ python payload_sender.py 192.168.1.100 9021 hen.bin
 
 ## Disclaimer
 
-This tool is provided as-is for research and development purposes only. Use at your own risk. The developers are not responsible for any damage, data loss, or consequences resulting from the use of this software.
+This tool is provided as-is for research and development purposes only.  
+Use at your own risk.  
+The developers are not responsible for any damage, data loss, or consequences resulting from the use of this software.  

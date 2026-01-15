@@ -25,7 +25,7 @@
 
 (async function() {
     try {
-        const lapse_version = "Y2JB Lapse 1.0 by Gezine";
+        const lapse_version = "Y2JB Lapse 1.1 by Gezine";
         
         let failcheck_path;
 
@@ -1731,12 +1731,6 @@
                     sds_alt = null;
                 }
                 
-                if (prev_core >= 0) {
-                    await log("Restoring to previous core: " + prev_core);
-                    pin_to_core(prev_core);
-                    prev_core = -1;
-                }
-                
                 set_rtprio(prev_rtprio);
 
                 await log("Cleanup completed");
@@ -1899,7 +1893,7 @@
             await log("Lapse finished\nClosing Y2JB...");
             send_notification("Lapse finished\nClosing Y2JB...");
             
-            kill_youtube();
+            await kill_youtube();
             
         } catch (e) {
             await log("Lapse error: " + e.message);

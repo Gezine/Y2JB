@@ -17,6 +17,7 @@ let call_rop;
 let call;
 let syscall;
 
+let sceKernelGetModuleInfoFromAddr;
 let sceKernelAllocateMainDirectMemory;
 let sceKernelMapNamedDirectMemory; 
 
@@ -154,6 +155,7 @@ let SYSCALL = {
     listen: 0x6an,
     getsockopt: 0x76n,
     netgetiflist: 0x7dn,
+    sendto: 0x85n,
     sysctl: 0xcan,
     nanosleep: 0xf0n,
     sigaction: 0x1a0n,
