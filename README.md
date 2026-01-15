@@ -70,11 +70,9 @@ Y2JB requires a **fake-activated account** to run properly.
 
 ### Blocking YouTube Updates (appinfo_editor.py)
 
-**Note:** If you're using backup file version 1.2.1 or higher from the releases page, you can skip this section.
-
 **⚠️ CRITICAL WARNING:** Database corruption can result in the deletion of **ALL installed FPKGs and savedata** stored on your internal storage. Before proceeding with this section, **backup your savedata** using the PS5's built-in backup and restore feature in Settings to prevent data loss.
 
-This script prevents the YouTube app from updating if you accidentally connect to the internet. Allowing updates can cause a softlock that prevents YouTube from launching (see next section for fix instructions).
+This script prevents the YouTube app from updating if you accidentally connect to the internet. Allowing updates can cause a softlock that prevents YouTube from launching (see next section for fix instructions).  
 
 **Steps:**
 1. After installing the YouTube PKG, retrieve `/system_data/priv/mms/appinfo.db` from your PS5 using FTP
