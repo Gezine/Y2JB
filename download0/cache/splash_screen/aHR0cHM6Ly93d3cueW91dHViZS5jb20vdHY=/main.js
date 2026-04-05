@@ -25,6 +25,10 @@ let NETWORK_LOGGING = false;
 // Use setlogserver.js payload to change server url at runtime
 let LOG_SERVER = 'http://192.168.1.180:8080/log';
 
+let _log_socket_fd = null;
+let _log_socket_buf = null;
+const _LOG_SOCKET_MAXLEN = 4096;
+
 async function checkLogServer() {
     try {
         const timeoutPromise = new Promise((_, reject) => 
@@ -89,6 +93,26 @@ async function log(msg) {
                 method: 'POST',
                 body: message,
             });
+        } catch (e) { }
+    }
+
+    if (_log_socket_fd !== null && typeof syscall !== 'undefined') {
+        try {
+            if (!_log_socket_buf) {
+                _log_socket_buf = malloc(_LOG_SOCKET_MAXLEN);
+            }
+            const line = message + '\n';
+            const len = Math.min(line.length, _LOG_SOCKET_MAXLEN);
+            for (let i = 0; i < len; i++) {
+                write8(_log_socket_buf + BigInt(i), line.charCodeAt(i) & 0xFF);
+            }
+            let sent = 0;
+            while (sent < len) {
+                const n = syscall(SYSCALL.write, _log_socket_fd, _log_socket_buf + BigInt(sent), BigInt(len - sent));
+                const nv = Number(n);
+                if (nv <= 0) break;
+                sent += nv;
+            }
         } catch (e) { }
     }
 }

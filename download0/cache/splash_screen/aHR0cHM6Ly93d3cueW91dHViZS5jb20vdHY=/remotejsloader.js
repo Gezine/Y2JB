@@ -177,14 +177,19 @@
             }
 
             const js_code = decoder.decode(bytes);
-            
-            syscall(SYSCALL.close, client_fd);
+
+            write32(enable, 1);
+            syscall(SYSCALL.setsockopt, client_fd, SOL_SOCKET, 0x800n, enable, 4n);
+            _log_socket_fd = client_fd;
 
             await log("Executing payload...");
-            await eval(js_code);
-            await log("Executed successfully");
-            
-            await log("Connection closed");
+            try {
+                await eval(js_code);
+                await log("Executed successfully");
+            } finally {
+                _log_socket_fd = null;
+                syscall(SYSCALL.close, client_fd);
+            }
 
         } catch (e) {
             await log("ERROR in accept loop: " + e.message);
