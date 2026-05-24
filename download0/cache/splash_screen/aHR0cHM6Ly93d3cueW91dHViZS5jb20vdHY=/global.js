@@ -40,7 +40,8 @@ let return_value_buf;
 let saved_fp = 0n;
 
 let FW_VERSION;
-let TITLE_ID;
+
+let SCE_KERNEL_DLSYM = 0n;
 
 const PAGE_SIZE = 0x4000;
 const PHYS_PAGE_SIZE = 0x1000;
@@ -64,9 +65,7 @@ const SO_REUSEADDR = 4n;
 const PROT_NONE = 0x0n;
 const PROT_READ = 0x1n;
 const PROT_WRITE = 0x2n;
-const PROT_EXEC  = 0x4n;
-const PROT_RWX   = PROT_READ | PROT_WRITE | PROT_EXEC;
-
+const PROT_EXECUTE = 0x4n;
 const GPU_READ = 0x10n;
 const GPU_WRITE = 0x20n;
 const GPU_RW = 0x30n;
@@ -108,6 +107,36 @@ let ROP = {
     get mov_rax_0x200000000() { return eboot_base + 0x1283d40n; },
     get mov_rsp_rbp()         { return eboot_base + 0xb1424n;   },
     get ret()                 { return eboot_base + 0x32n;      },
+};
+
+let DLSYM_OFFSETS = {
+    "4.03": 0x317D0n,
+    "4.50": 0x317D0n,
+    "4.51": 0x317D0n,
+    "5.00": 0x32160n,
+    "5.02": 0x32160n,
+    "5.10": 0x32160n,
+    "5.50": 0x32230n,
+    "6.00": 0x330A0n,
+    "6.02": 0x330A0n,
+    "6.50": 0x33110n,
+    "7.00": 0x33E90n,
+    "7.01": 0x33E90n,
+    "7.20": 0x33ED0n,
+    "7.40": 0x33ED0n,
+    "7.60": 0x33ED0n,
+    "7.61": 0x33ED0n,
+    "8.00": 0x342E0n,
+    "8.20": 0x342E0n,
+    "8.40": 0x342E0n,
+    "8.60": 0x342E0n,
+    "9.00": 0x350E0n,
+    "9.05": 0x350E0n,
+    "9.20": 0x350E0n,
+    "9.40": 0x350E0n,
+    "9.60": 0x350E0n,
+    "10.00": 0x349C0n,
+    "10.01": 0x349C0n
 };
 
 let SYSCALL = {
