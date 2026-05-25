@@ -1,6 +1,6 @@
 
-let BIN_NAME    = "kexp_v6.bin";
-let ELFLDR_NAME = "elfldr_1320_v5.elf";
+let BIN_NAME    = "kexp_2026_05_25.bin";
+let ELFLDR_NAME = "elfldr-ps5-0.23.elf";
 
 let elfldr_addr = 0n;
 let elfldr_size = 0n;

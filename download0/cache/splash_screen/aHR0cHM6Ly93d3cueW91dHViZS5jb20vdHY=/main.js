@@ -5,7 +5,7 @@
     of the MIT license.  See the LICENSE file for details.
 */
 
-const version_string = "Y2JB 1.4 by Gezine";
+const version_string = "Y2JB 1.5 by Gezine";
 
 function load_localscript(src) {
     return new Promise((resolve, reject) => {
