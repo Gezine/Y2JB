@@ -146,6 +146,7 @@ python payload_sender.py 192.168.1.100 9021 hen.bin
 * **[zecoxao](https://github.com/zecoxao), [idlesauce](https://github.com/idlesauce), and [TheFlow](https://github.com/theofficialflow)** - Helping troubleshoot dlsym
 * **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB
 * **Rush** - Creating Y2JB backup file
+* **[ufm42](https://github.com/ufm42)** - [kexp](https://github.com/ufm42/kexp) used for PS5 post JB all-in-one shellcode
 
 ## Disclaimer
 

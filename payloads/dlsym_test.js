@@ -12,9 +12,4 @@
 
     await log("sceKernelAllocateMainDirectMemory : " +  toHex(read64(addr_out)));
     
-    await log("Test 2 : sceKernelDlsym");
-    
-    let sceKernelAllocateMainDirectMemory = dlsym(LIBKERNEL_HANDLE, "sceKernelAllocateMainDirectMemory");
-    await log("sceKernelAllocateMainDirectMemory : " +  toHex(sceKernelAllocateMainDirectMemory));
-    
 })();

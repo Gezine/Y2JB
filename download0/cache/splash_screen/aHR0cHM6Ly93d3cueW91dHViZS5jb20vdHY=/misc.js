@@ -321,10 +321,7 @@ function load_prx(path) {
 
 function dlsym(handle, sym) {
     check_jailbroken();
-    if (SCE_KERNEL_DLSYM === 0n) {
-        throw new Error("dlsym offset not available for firmware " + FW_VERSION);
-    }
-
+    
     if (typeof sym !== "string") {
         throw new Error("dlsym expect string symbol name");
     }
@@ -332,7 +329,7 @@ function dlsym(handle, sym) {
     const sym_addr = alloc_string(sym);
     const addr_out = malloc(0x8n);
 
-    const result = call(SCE_KERNEL_DLSYM, handle, sym_addr, addr_out);
+    const result = syscall(SYSCALL.dlsym, handle, sym_addr, addr_out);
     if (result === 0xffffffffffffffffn) {
         throw new Error("dlsym error");
     }
@@ -341,13 +338,20 @@ function dlsym(handle, sym) {
 }
 
 function get_title_id() {
-    const sceKernelGetAppInfo = dlsym(LIBKERNEL_HANDLE, "sceKernelGetAppInfo");
     const pid = syscall(SYSCALL.getpid);
 
+    const mib = malloc(0x10n);
+    write32(mib + 0x0n, 1n);
+    write32(mib + 0x4n, 14n);
+    write32(mib + 0x8n, 35n);
+    write32(mib + 0xCn, pid);
+
     const app_info = malloc(0x100n);
-    const result = call(sceKernelGetAppInfo, pid, app_info);
-    if (result !== 0n) {
-        throw new Error("sceKernelGetAppInfo error: " + hex(result));
+    const oldlen = malloc(0x8n);
+    write64(oldlen, 0x58n);
+    
+    if (syscall(SYSCALL.sysctl, mib, 4n, app_info, oldlen, 0n, 0n) === 0xffffffffffffffffn) {
+        throw new Error("sysctl failed in get_title_id()");
     }
 
     return read_null_terminated_string(app_info + 0x10n);
@@ -468,43 +472,6 @@ function nanosleep(nsec) {
     syscall(SYSCALL.nanosleep, timespec);
 }
 
-
-function get_dlsym_offset(fw_version) {
-    const [major, minor] = fw_version.split(".").map(Number);
-    
-    // Try exact match first
-    const version_key = `${major}.${minor.toString().padStart(2, '0')}`;
-    if (DLSYM_OFFSETS[version_key]) {
-        return DLSYM_OFFSETS[version_key];
-    }
-    
-    // Find closest version within same major
-    const available_versions = Object.keys(DLSYM_OFFSETS)
-        .filter(v => v.startsWith(`${major}.`))
-        .map(v => ({
-            key: v,
-            minor: parseInt(v.split(".")[1])
-        }));
-    
-    if (available_versions.length === 0) {
-        throw new Error("No dlsym offset found for firmware version " + fw_version);
-    }
-    
-    // Find version with minimum distance to current minor
-    let closest = available_versions[0];
-    let min_distance = Math.abs(closest.minor - minor);
-    
-    for (let version of available_versions) {
-        const distance = Math.abs(version.minor - minor);
-        if (distance < min_distance) {
-            min_distance = distance;
-            closest = version;
-        }
-    }
-    
-    return DLSYM_OFFSETS[closest.key];
-}
-
 async function send_network(ip_address, port, sock_type, buffer) {
     const sockaddr_in = malloc(16);
     const buf_ptr = malloc(buffer.length);
@@ -555,19 +522,8 @@ async function send_network(ip_address, port, sock_type, buffer) {
     syscall(SYSCALL.close, sock_fd);
 }
 
-async function kill_youtube() {
-    try {
-        check_jailbroken();
-        
-        const killyoutube_download0_path = "/mnt/sandbox/" + get_title_id() + "_000/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/kill_youtube.elf";
-        
-        const file_data = await read_file(killyoutube_download0_path);
-        if (!file_data) {
-            throw new Error("Failed to read file");
-        }
-        
-        await send_network("127.0.0.1", 9021, SOCK_STREAM, file_data);
-    } catch (e) {
-        await log("ERROR in kill_youtube: " + e.message);
-    }
+function kill_youtube() {
+    const pid = syscall(SYSCALL.getpid);
+    syscall(SYSCALL.kill, pid, SIGKILL);
 }
+
