@@ -106,6 +106,9 @@
 
     // Initial setup (retry until port 50000, but fall back to last random port if attempts exhausted)
     let { sock_fd, port } = await setup_socket_until_port_50000();
+    
+    call(read64(Y2_OFFSET.sceMsgDialogTerminate));
+    call(read64(Y2_OFFSET.sceErrorDialogTerminate));
 
     const current_ip = get_current_ip();
     if (current_ip === null) {

