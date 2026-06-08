@@ -176,6 +176,17 @@
                 bytes[i] = Number(read8(payload_buf + BigInt(i)));
             }
 
+            if (total_read >= 4 &&
+                bytes[0] === 0x7F &&
+                bytes[1] === 0x45 &&
+                bytes[2] === 0x4C &&
+                bytes[3] === 0x46) {
+                await log("ELF payload is not supported.\nOnly send javascript file");
+                send_notification("ELF payload is not supported.\nOnly send javascript file");
+                syscall(SYSCALL.close, client_fd);
+                continue;
+            }
+
             const js_code = decoder.decode(bytes);
 
             write32(enable, 1);

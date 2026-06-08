@@ -8,7 +8,8 @@ Userland code execution using the PS5 YouTube app.
 
 ### For Jailbroken PS5 (Webkit, Lua, BD-JB)
 - Fake or legit activated PS5
-- USA YouTube app version 1.03 PKG
+- For firmware 4.03 to 12.40 get YouTube app (PPSA01650) version 01.000.003 PKG
+- For firmware 12.60 and up get YouTube app (PPSA01650) version 01.000.030 PKG
 - FTP access to the console
 
 ### For Non-Jailbroken PS5
@@ -54,7 +55,7 @@ Y2JB requires a **fake-activated account** to run properly.
 
 ### Jailbroken PS5
 
-1. Install YouTube app version 1.03 PKG on your PS5
+1. Install YouTube app PKG on your PS5
 2. Use FTP to access the following path (create if not present):
    ```
    /user/download/PPSA01650
