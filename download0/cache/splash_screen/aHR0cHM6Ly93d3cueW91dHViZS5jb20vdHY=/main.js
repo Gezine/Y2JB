@@ -705,7 +705,7 @@ function trigger() {
             await log("libc_base @ " + toHex(libc_base));
             
         } else if (text_leak_mask == 0xFDFn) {
-            Y2_VERSION = "01.000.030 (min fw 12.02)";
+            Y2_VERSION = "01.000.030 (min fw 12.20)";
             await log("Youtube " + Y2_VERSION + " detected");
             Y2_OFFSET = Y2_OFFSET_1220;
             ROP = ROP_1220;
