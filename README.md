@@ -69,6 +69,10 @@ Y2JB requires a **fake-activated account** to run properly.
 
 **⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
 
+3. There will be two Youtube apps installed
+   Use Youtube (4.03) if you are using firmware 4.03 to 12.40 
+   Use Youtube (12.20) if you are using firmware 12.20 and up
+
 ### Blocking YouTube Updates (appinfo_editor.py)
 
 **⚠️ CRITICAL WARNING:** Database corruption can result in the deletion of **ALL installed FPKGs and savedata** stored on your internal storage. Before proceeding with this section, **backup your savedata** using the PS5's built-in backup and restore feature in Settings to prevent data loss.
