@@ -64,7 +64,9 @@ Y2JB requires a **fake-activated account** to run properly.
 
 ### Non-Jailbroken PS5
 
-1. Download the backup file from the releases page
+1. Download the backup file from the releases page  
+**Firmware 4.03 – 12.40** → `Y2JB_backup_1.6(4.03)`  
+**Firmware 12.60 and up** → `Y2JB_backup_1.6(12.20)`  
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)
 
 **⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
